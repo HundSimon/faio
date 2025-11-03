@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:faio/domain/models/content_item.dart';
 
@@ -15,9 +16,9 @@ class FeedScreen extends ConsumerWidget {
     ref.listen(feedStreamProvider, (previous, next) {
       next.whenOrNull(
         error: (error, stackTrace) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载 e621 内容失败：$error')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('加载 e621 内容失败：$error')));
         },
       );
     });
@@ -41,8 +42,9 @@ class FeedScreen extends ConsumerWidget {
         ),
         body: feedAsync.when(
           data: (items) {
-            final illustrations =
-                items.where((item) => item.type == ContentType.illustration).toList();
+            final illustrations = items
+                .where((item) => item.type == ContentType.illustration)
+                .toList();
 
             return TabBarView(
               children: [
@@ -54,9 +56,7 @@ class FeedScreen extends ConsumerWidget {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stackTrace) => Center(
-            child: Text('加载内容失败：$error'),
-          ),
+          error: (error, stackTrace) => Center(child: Text('加载内容失败：$error')),
         ),
       ),
     );
@@ -128,22 +128,24 @@ class _IllustrationTile extends StatelessWidget {
       return Container(
         color: theme.colorScheme.surfaceVariant,
         alignment: Alignment.center,
-        child: Icon(
-          icon,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
+        child: Icon(icon, color: theme.colorScheme.onSurfaceVariant),
       );
     }
 
-    return ClipRRect(
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(12),
-      child: previewUrl != null
-          ? Image.network(
-              previewUrl.toString(),
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => placeholder(Icons.broken_image),
-            )
-          : placeholder(Icons.image),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/feed/detail', extra: item),
+        child: previewUrl != null
+            ? Image.network(
+                previewUrl.toString(),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => placeholder(Icons.broken_image),
+              )
+            : placeholder(Icons.image),
+      ),
     );
   }
 }

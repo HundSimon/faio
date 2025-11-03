@@ -5,9 +5,9 @@ class ContentMapper {
   const ContentMapper._();
 
   static FaioContent fromE621(E621Post post) {
-    final normalizedSummary = post.description.isNotEmpty
-        ? post.description
-        : post.tags.take(8).join(', ');
+    final normalizedSummary = post.description.trim().isNotEmpty
+        ? post.description.trim()
+        : '';
 
     final preview = post.preview.url ?? post.file.url;
     final aspectRatio = _resolveAspectRatio(post);
@@ -41,7 +41,9 @@ class ContentMapper {
     if (post.tags.contains('comic')) {
       return ContentType.comic;
     }
-    if (post.tags.any((tag) => tag.contains('story') || tag.contains('novel'))) {
+    if (post.tags.any(
+      (tag) => tag.contains('story') || tag.contains('novel'),
+    )) {
       return ContentType.novel;
     }
     return ContentType.illustration;

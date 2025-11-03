@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/models/content_item.dart';
 import '../features/feed/presentation/feed_screen.dart';
+import '../features/feed/presentation/illustration_detail_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
@@ -11,6 +13,7 @@ import '../features/shell/presentation/home_shell.dart';
 /// Route names centralised for consistency and deep linking.
 abstract final class AppRoute {
   static const feed = '/feed';
+  static const feedDetail = 'feed_detail';
   static const search = '/search';
   static const library = '/library';
   static const settings = '/settings';
@@ -34,6 +37,19 @@ final appRouterProvider = Provider<GoRouter>(
                 path: AppRoute.feed,
                 name: AppRoute.feed,
                 builder: (context, state) => const FeedScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'detail',
+                    name: AppRoute.feedDetail,
+                    builder: (context, state) {
+                      final extra = state.extra;
+                      if (extra is! FaioContent) {
+                        return const _RouteErrorScreen();
+                      }
+                      return IllustrationDetailScreen(content: extra);
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -69,3 +85,15 @@ final appRouterProvider = Provider<GoRouter>(
     ],
   ),
 );
+
+class _RouteErrorScreen extends StatelessWidget {
+  const _RouteErrorScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: const Center(child: Text('未找到内容')),
+    );
+  }
+}
