@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../data/mock/mock_content_repository.dart';
+import '../../../data/repositories/content_repository_impl.dart';
 import '../../../domain/models/content_item.dart';
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
@@ -12,6 +12,6 @@ final searchResultsProvider =
     return const [];
   }
 
-  final repository = ref.watch(mockContentRepositoryProvider);
+  final repository = ref.watch(contentRepositoryProvider);
   return repository.search(query: query.trim());
 });

@@ -11,83 +11,96 @@ class FeedScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(mockFeedProvider);
+    final feedAsync = ref.watch(feedStreamProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('信息流'),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            leading: item.previewUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: Image.network(
-                        item.previewUrl.toString(),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.image),
-                      ),
-                    ),
-                  )
-                : CircleAvatar(
-                    backgroundColor:
-                        Theme.of(context).colorScheme.primaryContainer,
-                    child: Icon(
-                      switch (item.type) {
-                        ContentType.comic => Icons.menu_book,
-                        ContentType.novel => Icons.auto_stories,
-                        ContentType.audio => Icons.headphones,
-                        ContentType.illustration => Icons.image,
-                      },
-                    ),
-                  ),
-            title: Text(item.title),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(
-                  item.summary,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+      body: feedAsync.when(
+        data: (items) {
+          if (items.isEmpty) {
+            return const Center(
+              child: Text('暂时没有可显示的内容'),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return ListTile(
+                contentPadding: const EdgeInsets.all(12),
+                tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: -8,
-                  children: [
-                    Chip(
-                      label: Text(item.source),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    Chip(
-                      label: Text(item.rating),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    if (item.authorName != null)
-                      Chip(
-                        label: Text(item.authorName!),
-                        visualDensity: VisualDensity.compact,
+                leading: item.previewUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: Image.network(
+                            item.previewUrl.toString(),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                          ),
+                        ),
+                      )
+                    : CircleAvatar(
+                        backgroundColor:
+                            Theme.of(context).colorScheme.primaryContainer,
+                        child: Icon(
+                          switch (item.type) {
+                            ContentType.comic => Icons.menu_book,
+                            ContentType.novel => Icons.auto_stories,
+                            ContentType.audio => Icons.headphones,
+                            ContentType.illustration => Icons.image,
+                          },
+                        ),
                       ),
+                title: Text(item.title),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      item.summary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: -8,
+                      children: [
+                        Chip(
+                          label: Text(item.source),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Chip(
+                          label: Text(item.rating),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        if (item.authorName != null)
+                          Chip(
+                            label: Text(item.authorName!),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-            onTap: () {},
+                onTap: () {},
+              );
+            },
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemCount: items.length,
           );
         },
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemCount: items.length,
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Text('加载内容失败：$error'),
+        ),
       ),
     );
   }
