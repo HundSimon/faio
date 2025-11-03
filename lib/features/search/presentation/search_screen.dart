@@ -34,6 +34,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final resultsAsync = ref.watch(searchResultsProvider);
 
+    ref.listen(searchResultsProvider, (previous, next) {
+      next.whenOrNull(
+        error: (error, stackTrace) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('搜索失败：$error')),
+          );
+        },
+      );
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('搜索'),

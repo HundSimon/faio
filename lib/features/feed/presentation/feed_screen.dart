@@ -13,6 +13,16 @@ class FeedScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feedAsync = ref.watch(feedStreamProvider);
 
+    ref.listen(feedStreamProvider, (previous, next) {
+      next.whenOrNull(
+        error: (error, stackTrace) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载 e621 内容失败：$error')),
+          );
+        },
+      );
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('信息流'),

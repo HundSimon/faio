@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/content_item.dart';
 import '../../domain/repositories/content_repository.dart';
+import '../e621/e621_auth.dart';
 import '../e621/e621_providers.dart';
 import '../e621/e621_service.dart';
 import 'mappers/content_mapper.dart';
@@ -38,6 +39,8 @@ class ContentRepositoryImpl implements ContentRepository {
     }
   }
 
+  Future<void> refreshFeed() => _refreshFeed();
+
   @override
   Future<List<FaioContent>> search({
     required String query,
@@ -66,6 +69,9 @@ class ContentRepositoryImpl implements ContentRepository {
 final contentRepositoryProvider = Provider<ContentRepository>((ref) {
   final e621Service = ref.watch(e621ServiceProvider);
   final repository = ContentRepositoryImpl(e621Service: e621Service);
+  ref.listen<E621Credentials?>(e621AuthProvider, (previous, next) {
+    unawaited(repository.refreshFeed());
+  });
   ref.onDispose(repository.dispose);
   return repository;
 }, name: 'contentRepositoryProvider');
