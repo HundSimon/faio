@@ -56,9 +56,9 @@ class E621MockService implements E621Service {
 }
 
 /// Provides a mock service for development environments.
-final e621ServiceProvider = Provider<E621Service>(
+final e621MockServiceProvider = Provider<E621MockService>(
   (ref) => E621MockService(),
-  name: 'e621ServiceProvider',
+  name: 'e621MockServiceProvider',
 );
 
 List<E621Post> _buildSamplePosts() {

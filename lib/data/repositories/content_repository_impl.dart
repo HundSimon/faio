@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/content_item.dart';
 import '../../domain/repositories/content_repository.dart';
-import '../e621/e621_mock_service.dart';
+import '../e621/e621_providers.dart';
 import '../e621/e621_service.dart';
 import 'mappers/content_mapper.dart';
 
@@ -29,9 +29,13 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   Future<void> _refreshFeed() async {
-    final posts = await _e621Service.fetchPosts(limit: 30);
-    final items = posts.map(ContentMapper.fromE621).toList(growable: false);
-    _controller.add(items);
+    try {
+      final posts = await _e621Service.fetchPosts(limit: 30);
+      final items = posts.map(ContentMapper.fromE621).toList(growable: false);
+      _controller.add(items);
+    } catch (error, stackTrace) {
+      _controller.addError(error, stackTrace);
+    }
   }
 
   @override
