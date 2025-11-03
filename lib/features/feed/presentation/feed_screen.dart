@@ -124,59 +124,26 @@ class _IllustrationTile extends StatelessWidget {
     final theme = Theme.of(context);
     final previewUrl = item.previewUrl;
 
+    Widget placeholder(IconData icon) {
+      return Container(
+        color: theme.colorScheme.surfaceVariant,
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (previewUrl != null)
-            Image.network(
+      child: previewUrl != null
+          ? Image.network(
               previewUrl.toString(),
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: theme.colorScheme.surfaceVariant,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image),
-              ),
+              errorBuilder: (_, __, ___) => placeholder(Icons.broken_image),
             )
-          else
-            Container(
-              color: theme.colorScheme.surfaceVariant,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.image,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black87,
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-              child: Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+          : placeholder(Icons.image),
     );
   }
 }
