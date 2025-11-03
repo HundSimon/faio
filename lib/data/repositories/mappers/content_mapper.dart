@@ -4,12 +4,18 @@ import '../../e621/models/e621_post.dart';
 class ContentMapper {
   const ContentMapper._();
 
-  static FaioContent fromE621(E621Post post) {
+  static FaioContent? fromE621(E621Post post) {
     final normalizedSummary = post.description.trim().isNotEmpty
         ? post.description.trim()
         : '';
 
-    final preview = post.preview.url ?? post.file.url;
+    final primaryImage = post.preview.url ?? post.sample.url ?? post.file.url;
+    if (primaryImage == null) {
+      return null;
+    }
+
+    final sample = post.sample.url;
+    final original = post.file.url;
     final aspectRatio = _resolveAspectRatio(post);
 
     return FaioContent(
@@ -18,18 +24,26 @@ class ContentMapper {
       title: post.tags.isNotEmpty ? post.tags.first : 'Untitled',
       summary: normalizedSummary,
       type: _inferType(post),
-      previewUrl: preview,
+      previewUrl: primaryImage,
+      originalUrl: original,
+      sampleUrl: sample,
       previewAspectRatio: aspectRatio,
       publishedAt: post.createdAt,
+      updatedAt: post.updatedAt,
       rating: post.rating.toNormalizedRating(),
       authorName: null,
       tags: post.tags,
+      favoriteCount: post.favCount,
+      sourceLinks: post.sources,
     );
   }
 
   static double? _resolveAspectRatio(E621Post post) {
     if (post.preview.width > 0 && post.preview.height > 0) {
       return post.preview.width / post.preview.height;
+    }
+    if (post.sample.width > 0 && post.sample.height > 0) {
+      return post.sample.width / post.sample.height;
     }
     if (post.file.width > 0 && post.file.height > 0) {
       return post.file.width / post.file.height;

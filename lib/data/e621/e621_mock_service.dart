@@ -68,27 +68,16 @@ List<E621Post> _buildSamplePosts() {
       id: 3849201,
       createdAt: now.subtract(const Duration(hours: 2)),
       rating: E621Rating.safe,
-      tags: const [
-        'dragon',
-        'landscape',
-        'sunrise',
-        'flying',
-        'aerial',
-      ],
+      tags: const ['dragon', 'landscape', 'sunrise', 'flying', 'aerial'],
       description: 'A dragon glides across the sunrise-hued clouds.',
-      file: const E621FileInfo(
-        url: null,
-        width: 1920,
-        height: 1080,
-      ),
+      file: const E621FileInfo(url: null, width: 1920, height: 1080),
+      sample: const E621FileInfo(url: null, width: 1280, height: 720),
       preview: E621PreviewInfo(
         url: Uri.parse('https://assets.example.com/mock/e621-flight.jpg'),
         width: 300,
         height: 200,
       ),
-      sources: [
-        Uri.parse('https://e621.net/posts/3849201'),
-      ],
+      sources: [Uri.parse('https://e621.net/posts/3849201')],
       favCount: 128,
     ),
     E621Post(
@@ -97,19 +86,10 @@ List<E621Post> _buildSamplePosts() {
       rating: E621Rating.questionable,
       tags: const ['novel', 'sci-fi', 'furry', 'story'],
       description: 'Serialized sci-fi novel featuring interstellar traders.',
-      file: const E621FileInfo(
-        url: null,
-        width: 0,
-        height: 0,
-      ),
-      preview: const E621PreviewInfo(
-        url: null,
-        width: 0,
-        height: 0,
-      ),
-      sources: [
-        Uri.parse('https://e621.net/posts/3849202'),
-      ],
+      file: const E621FileInfo(url: null, width: 0, height: 0),
+      sample: const E621FileInfo(url: null, width: 0, height: 0),
+      preview: const E621PreviewInfo(url: null, width: 0, height: 0),
+      sources: [Uri.parse('https://e621.net/posts/3849202')],
       favCount: 86,
     ),
     E621Post(
@@ -119,19 +99,14 @@ List<E621Post> _buildSamplePosts() {
       tags: const ['comic', 'adventure', 'jungle', 'anthro'],
       description:
           'Color comic preview showing an expedition team venturing through dense jungle.',
-      file: const E621FileInfo(
-        url: null,
-        width: 2048,
-        height: 1536,
-      ),
+      file: const E621FileInfo(url: null, width: 2048, height: 1536),
+      sample: const E621FileInfo(url: null, width: 1280, height: 960),
       preview: E621PreviewInfo(
         url: Uri.parse('https://assets.example.com/mock/eh-expo.jpg'),
         width: 400,
         height: 300,
       ),
-      sources: [
-        Uri.parse('https://e621.net/posts/3849203'),
-      ],
+      sources: [Uri.parse('https://e621.net/posts/3849203')],
       favCount: 64,
     ),
   ];

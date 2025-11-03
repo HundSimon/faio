@@ -82,36 +82,57 @@ class E621Post extends Equatable {
   const E621Post({
     required this.id,
     required this.createdAt,
+    this.updatedAt,
     required this.rating,
     required this.tags,
     required this.description,
     required this.file,
     required this.preview,
+    required this.sample,
     required this.sources,
     this.favCount = 0,
   });
 
   final int id;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final E621Rating rating;
   final List<String> tags;
   final String description;
   final E621FileInfo file;
   final E621PreviewInfo preview;
+  final E621FileInfo sample;
   final List<Uri> sources;
   final int favCount;
 
   factory E621Post.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(String? raw) {
+      if (raw == null || raw.isEmpty) {
+        return null;
+      }
+      return DateTime.tryParse(raw);
+    }
+
+    final createdAt =
+        parseDate(json['created_at'] as String?) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+
     return E621Post(
       id: json['id'] as int,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0),
+      createdAt: createdAt,
+      updatedAt: parseDate(json['updated_at'] as String?),
       rating: E621Rating.fromString(json['rating'] as String? ?? 's'),
       tags: _parseTags(json['tags']),
       description: json['description'] as String? ?? '',
-      file: E621FileInfo.fromJson(json['file'] as Map<String, dynamic>? ?? const {}),
-      preview:
-          E621PreviewInfo.fromJson(json['preview'] as Map<String, dynamic>? ?? const {}),
+      file: E621FileInfo.fromJson(
+        json['file'] as Map<String, dynamic>? ?? const {},
+      ),
+      preview: E621PreviewInfo.fromJson(
+        json['preview'] as Map<String, dynamic>? ?? const {},
+      ),
+      sample: E621FileInfo.fromJson(
+        json['sample'] as Map<String, dynamic>? ?? const {},
+      ),
       sources: _parseSources(json['sources']),
       favCount: json['fav_count'] as int? ?? 0,
     );
@@ -146,14 +167,16 @@ class E621Post extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        createdAt,
-        rating,
-        tags,
-        description,
-        file,
-        preview,
-        sources,
-        favCount,
-      ];
+    id,
+    createdAt,
+    updatedAt,
+    rating,
+    tags,
+    description,
+    file,
+    sample,
+    preview,
+    sources,
+    favCount,
+  ];
 }

@@ -11,9 +11,8 @@ import '../e621/e621_service.dart';
 import 'mappers/content_mapper.dart';
 
 class ContentRepositoryImpl implements ContentRepository {
-  ContentRepositoryImpl({
-    required E621Service e621Service,
-  }) : _e621Service = e621Service;
+  ContentRepositoryImpl({required E621Service e621Service})
+    : _e621Service = e621Service;
 
   final E621Service _e621Service;
 
@@ -33,7 +32,10 @@ class ContentRepositoryImpl implements ContentRepository {
   Future<void> _refreshFeed() async {
     try {
       final posts = await _e621Service.fetchPosts(limit: 30);
-      final items = posts.map(ContentMapper.fromE621).toList();
+      final items = posts
+          .map(ContentMapper.fromE621)
+          .whereType<FaioContent>()
+          .toList();
       items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
       _controller.add(items);
     } catch (error, stackTrace) {
@@ -56,13 +58,19 @@ class ContentRepositoryImpl implements ContentRepository {
     final normalizedTags = tags.toList();
     if (normalizedTags.isNotEmpty) {
       final posts = await _e621Service.fetchPosts(tags: normalizedTags);
-      final items = posts.map(ContentMapper.fromE621).toList();
+      final items = posts
+          .map(ContentMapper.fromE621)
+          .whereType<FaioContent>()
+          .toList();
       items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
       return items;
     }
 
     final posts = await _e621Service.searchPosts(query: query);
-    final items = posts.map(ContentMapper.fromE621).toList();
+    final items = posts
+        .map(ContentMapper.fromE621)
+        .whereType<FaioContent>()
+        .toList();
     items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
     return items;
   }
