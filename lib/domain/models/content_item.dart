@@ -17,6 +17,7 @@ class FaioContent extends Equatable {
     required this.summary,
     required this.type,
     required this.previewUrl,
+    this.previewAspectRatio,
     required this.publishedAt,
     required this.rating,
     this.authorName,
@@ -33,6 +34,7 @@ class FaioContent extends Equatable {
   final String summary;
   final ContentType type;
   final Uri? previewUrl;
+  final double? previewAspectRatio;
   final DateTime publishedAt;
 
   /// Normalised content rating (General/Mature/Adult).
@@ -49,6 +51,7 @@ class FaioContent extends Equatable {
         summary,
         type,
         previewUrl,
+        previewAspectRatio,
         publishedAt,
         rating,
         authorName,
@@ -60,6 +63,7 @@ class FaioContent extends Equatable {
     String? summary,
     ContentType? type,
     Uri? previewUrl,
+    double? previewAspectRatio,
     DateTime? publishedAt,
     String? rating,
     String? authorName,
@@ -72,6 +76,7 @@ class FaioContent extends Equatable {
       summary: summary ?? this.summary,
       type: type ?? this.type,
       previewUrl: previewUrl ?? this.previewUrl,
+      previewAspectRatio: previewAspectRatio ?? this.previewAspectRatio,
       publishedAt: publishedAt ?? this.publishedAt,
       rating: rating ?? this.rating,
       authorName: authorName ?? this.authorName,

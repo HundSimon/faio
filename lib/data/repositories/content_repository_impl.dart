@@ -33,7 +33,8 @@ class ContentRepositoryImpl implements ContentRepository {
   Future<void> _refreshFeed() async {
     try {
       final posts = await _e621Service.fetchPosts(limit: 30);
-      final items = posts.map(ContentMapper.fromE621).toList(growable: false);
+      final items = posts.map(ContentMapper.fromE621).toList();
+      items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
       _controller.add(items);
     } catch (error, stackTrace) {
       _controller.addError(error, stackTrace);
@@ -55,11 +56,15 @@ class ContentRepositoryImpl implements ContentRepository {
     final normalizedTags = tags.toList();
     if (normalizedTags.isNotEmpty) {
       final posts = await _e621Service.fetchPosts(tags: normalizedTags);
-      return posts.map(ContentMapper.fromE621).toList(growable: false);
+      final items = posts.map(ContentMapper.fromE621).toList();
+      items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+      return items;
     }
 
     final posts = await _e621Service.searchPosts(query: query);
-    return posts.map(ContentMapper.fromE621).toList(growable: false);
+    final items = posts.map(ContentMapper.fromE621).toList();
+    items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    return items;
   }
 
   void dispose() {

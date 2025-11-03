@@ -28,14 +28,10 @@ class E621HttpService implements E621Service {
     int limit = 20,
     List<String> tags = const [],
   }) async {
-    final queryTags = <String>[
-      'order:rank',
-      ...tags,
-    ];
     return _request(
       page: page,
       limit: limit,
-      tags: queryTags,
+      tags: tags,
     );
   }
 
@@ -60,6 +56,15 @@ class E621HttpService implements E621Service {
   }) async {
     await _rateLimiter.acquire();
 
+    final normalizedTags = tags
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList(growable: false);
+    final queryTags = <String>[
+      if (!normalizedTags.any((tag) => tag.startsWith('order:'))) 'order:id_desc',
+      ...normalizedTags,
+    ];
+
     final authHeaders = <String, String>{};
     final credentials = _credentials;
     if (credentials != null && credentials.isComplete) {
@@ -74,7 +79,7 @@ class E621HttpService implements E621Service {
       queryParameters: {
         'page': page,
         'limit': clampedLimit,
-        if (tags.isNotEmpty) 'tags': tags.join(' '),
+        if (queryTags.isNotEmpty) 'tags': queryTags.join(' '),
       },
       options: Options(
         headers: authHeaders.isEmpty ? null : authHeaders,
@@ -91,9 +96,11 @@ class E621HttpService implements E621Service {
       return const [];
     }
 
-    return posts
+    final parsed = posts
         .whereType<Map<String, dynamic>>()
         .map(E621Post.fromJson)
-        .toList(growable: false);
+        .toList();
+    parsed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return parsed;
   }
 }

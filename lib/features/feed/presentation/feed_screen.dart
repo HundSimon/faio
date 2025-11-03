@@ -5,7 +5,6 @@ import 'package:faio/domain/models/content_item.dart';
 
 import '../providers/feed_providers.dart';
 
-/// Unified content feed showing placeholder aggregated items.
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
 
@@ -23,94 +22,160 @@ class FeedScreen extends ConsumerWidget {
       );
     });
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('信息流'),
-      ),
-      body: feedAsync.when(
-        data: (items) {
-          if (items.isEmpty) {
-            return const Center(
-              child: Text('暂时没有可显示的内容'),
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('信息流'),
+          bottom: const TabBar(
+            isScrollable: false,
+            indicatorSize: TabBarIndicatorSize.tab,
+            tabAlignment: TabAlignment.fill,
+            tabs: [
+              Tab(text: 'AIO'),
+              Tab(text: '插画'),
+              Tab(text: '漫画'),
+              Tab(text: '小说'),
+            ],
+          ),
+        ),
+        body: feedAsync.when(
+          data: (items) {
+            final illustrations =
+                items.where((item) => item.type == ContentType.illustration).toList();
+
+            return TabBarView(
+              children: [
+                const _ComingSoonTab(message: 'AIO 体验敬请期待'),
+                _IllustrationGrid(items: illustrations),
+                const _ComingSoonTab(message: '漫画内容建设中'),
+                const _ComingSoonTab(message: '小说内容建设中'),
+              ],
             );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return ListTile(
-                contentPadding: const EdgeInsets.all(12),
-                tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                leading: item.previewUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: Image.network(
-                            item.previewUrl.toString(),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.image),
-                          ),
-                        ),
-                      )
-                    : CircleAvatar(
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primaryContainer,
-                        child: Icon(
-                          switch (item.type) {
-                            ContentType.comic => Icons.menu_book,
-                            ContentType.novel => Icons.auto_stories,
-                            ContentType.audio => Icons.headphones,
-                            ContentType.illustration => Icons.image,
-                          },
-                        ),
-                      ),
-                title: Text(item.title),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 4),
-                    Text(
-                      item.summary,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: -8,
-                      children: [
-                        Chip(
-                          label: Text(item.source),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        Chip(
-                          label: Text(item.rating),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        if (item.authorName != null)
-                          Chip(
-                            label: Text(item.authorName!),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                      ],
-                    ),
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stackTrace) => Center(
+            child: Text('加载内容失败：$error'),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IllustrationGrid extends StatelessWidget {
+  const _IllustrationGrid({required this.items});
+
+  final List<FaioContent> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      final theme = Theme.of(context);
+      return Center(
+        child: Text(
+          '暂时没有插画内容',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) => _IllustrationTile(item: items[index]),
+    );
+  }
+}
+
+class _ComingSoonTab extends StatelessWidget {
+  const _ComingSoonTab({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Text(
+        message,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _IllustrationTile extends StatelessWidget {
+  const _IllustrationTile({required this.item});
+
+  final FaioContent item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final previewUrl = item.previewUrl;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (previewUrl != null)
+            Image.network(
+              previewUrl.toString(),
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: theme.colorScheme.surfaceVariant,
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image),
+              ),
+            )
+          else
+            Container(
+              color: theme.colorScheme.surfaceVariant,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.image,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black87,
+                    Colors.transparent,
                   ],
                 ),
-                onTap: () {},
-              );
-            },
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemCount: items.length,
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: Text('加载内容失败：$error'),
-        ),
+              ),
+              child: Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
