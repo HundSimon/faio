@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/content_item.dart';
 import '../../domain/repositories/content_repository.dart';
 import '../e621/e621_auth.dart';
+import '../e621/e621_credentials.dart';
 import '../e621/e621_providers.dart';
 import '../e621/e621_service.dart';
 import 'mappers/content_mapper.dart';
