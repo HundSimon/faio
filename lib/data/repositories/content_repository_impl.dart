@@ -31,12 +31,7 @@ class ContentRepositoryImpl implements ContentRepository {
 
   Future<void> _refreshFeed() async {
     try {
-      final posts = await _e621Service.fetchPosts(limit: 30);
-      final items = posts
-          .map(ContentMapper.fromE621)
-          .whereType<FaioContent>()
-          .toList();
-      items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+      final items = await fetchFeedPage(page: 1);
       _controller.add(items);
     } catch (error, stackTrace) {
       _controller.addError(error, stackTrace);
@@ -44,6 +39,29 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   Future<void> refreshFeed() => _refreshFeed();
+
+  @override
+  Future<List<FaioContent>> fetchFeedPage({
+    required int page,
+    int limit = 30,
+    Iterable<String> tags = const [],
+  }) async {
+    final normalizedTags = tags
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList(growable: false);
+
+    final posts = await _e621Service.fetchPosts(
+      page: page,
+      limit: limit,
+      tags: normalizedTags,
+    );
+
+    final items =
+        posts.map(ContentMapper.fromE621).whereType<FaioContent>().toList();
+    items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    return items;
+  }
 
   @override
   Future<List<FaioContent>> search({
@@ -58,10 +76,8 @@ class ContentRepositoryImpl implements ContentRepository {
     final normalizedTags = tags.toList();
     if (normalizedTags.isNotEmpty) {
       final posts = await _e621Service.fetchPosts(tags: normalizedTags);
-      final items = posts
-          .map(ContentMapper.fromE621)
-          .whereType<FaioContent>()
-          .toList();
+      final items =
+          posts.map(ContentMapper.fromE621).whereType<FaioContent>().toList();
       items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
       return items;
     }

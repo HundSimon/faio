@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../domain/models/content_item.dart';
 import '../features/feed/presentation/feed_screen.dart';
 import '../features/feed/presentation/illustration_detail_screen.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -42,11 +41,21 @@ final appRouterProvider = Provider<GoRouter>(
                     path: 'detail',
                     name: AppRoute.feedDetail,
                     builder: (context, state) {
+                      int? index;
                       final extra = state.extra;
-                      if (extra is! FaioContent) {
+                      if (extra is int) {
+                        index = extra;
+                      } else {
+                        final indexParam = state.uri.queryParameters['index'];
+                        if (indexParam != null) {
+                          index = int.tryParse(indexParam);
+                        }
+                      }
+
+                      if (index == null) {
                         return const _RouteErrorScreen();
                       }
-                      return IllustrationDetailScreen(content: extra);
+                      return IllustrationDetailScreen(initialIndex: index);
                     },
                   ),
                 ],

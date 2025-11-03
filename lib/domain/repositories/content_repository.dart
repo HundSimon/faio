@@ -4,6 +4,12 @@ import '../models/content_item.dart';
 abstract interface class ContentRepository {
   Stream<List<FaioContent>> watchFeed();
 
+  Future<List<FaioContent>> fetchFeedPage({
+    required int page,
+    int limit = 30,
+    Iterable<String> tags = const [],
+  });
+
   Future<List<FaioContent>> search({
     required String query,
     Iterable<String> tags = const [],
