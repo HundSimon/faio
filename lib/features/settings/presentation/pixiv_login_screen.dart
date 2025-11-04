@@ -82,8 +82,9 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
       return NavigationDecision.prevent;
     }
     final uri = Uri.tryParse(request.url);
+    debugPrint('Pixiv WebView navigating to ${request.url}');
     if (uri != null && _isTrackingDomain(uri)) {
-      debugPrint('Allowing tracking navigation to ${uri.host}');
+      debugPrint('Pixiv WebView encountered tracking domain ${uri.host}');
     }
     if (request.url.startsWith(PixivAuthFlow.redirectUri)) {
       final redirectUri = uri ?? Uri.parse(request.url);
@@ -94,6 +95,7 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
         });
         return NavigationDecision.prevent;
       }
+      debugPrint('Pixiv WebView intercepted callback (code length=${code.length})');
       _handledAuthorization = true;
       _exchangeCode(code);
       return NavigationDecision.prevent;
@@ -164,7 +166,11 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
       final session = await flow.createSession();
       if (!mounted) return;
       _session = session;
+      debugPrint(
+        'Pixiv WebView session created (appVersion=${session.appVersion})',
+      );
       await _controller.setUserAgent(session.userAgent);
+      debugPrint('Pixiv WebView loading URL: ${session.loginUri}');
       await _controller.loadRequest(session.loginUri, headers: {
         'User-Agent': session.userAgent,
         'Referer': 'https://app-api.pixiv.net/',
@@ -202,12 +208,17 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
     });
 
     try {
+      debugPrint(
+        'Pixiv WebView exchanging code length ${code.length} '
+        'with verifier length ${session.codeVerifier.length}',
+      );
       final flow = ref.read(pixivAuthFlowProvider);
       final credentials = await flow.exchange(code: code, session: session);
       if (!mounted) return;
       ref.read(pixivAuthProvider.notifier).setCredentials(credentials);
       Navigator.of(context).pop(true);
     } catch (error) {
+      debugPrint('Pixiv WebView exchange failed: $error');
       if (!mounted) return;
       setState(() {
         _isExchanging = false;
