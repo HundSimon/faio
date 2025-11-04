@@ -27,6 +27,7 @@ class ContentRepositoryImpl implements ContentRepository {
   final StreamController<List<FaioContent>> _controller =
       StreamController<List<FaioContent>>.broadcast();
   bool _initialized = false;
+  bool _disposed = false;
 
   @override
   Stream<List<FaioContent>> watchFeed() {
@@ -38,10 +39,19 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   Future<void> _refreshFeed() async {
+    if (_disposed) {
+      return;
+    }
     try {
       final items = await fetchFeedPage(page: 1);
+      if (_disposed) {
+        return;
+      }
       _controller.add(items);
     } catch (error, stackTrace) {
+      if (_disposed) {
+        return;
+      }
       _controller.addError(error, stackTrace);
     }
   }
@@ -64,6 +74,7 @@ class ContentRepositoryImpl implements ContentRepository {
     final sourceStacks = <StackTrace>[];
 
     Future<List<FaioContent>> safeFetch(
+      String source,
       Future<List<FaioContent>> Function() fetch,
     ) async {
       try {
@@ -77,11 +88,14 @@ class ContentRepositoryImpl implements ContentRepository {
 
     sources.add(
       safeFetch(
+        'e621',
         () => _fetchE621(page: page, limit: limit, tags: normalizedTags),
       ),
     );
 
-    sources.add(safeFetch(() => _fetchPixiv(page: page, limit: limit)));
+    sources.add(
+      safeFetch('pixiv', () => _fetchPixiv(page: page, limit: limit)),
+    );
 
     final results = await Future.wait(sources);
 
@@ -140,6 +154,7 @@ class ContentRepositoryImpl implements ContentRepository {
   }
 
   void dispose() {
+    _disposed = true;
     _controller.close();
   }
 

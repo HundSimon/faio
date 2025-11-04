@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/network/rate_limiter.dart';
 import 'models/pixiv_models.dart';
@@ -134,7 +135,7 @@ class PixivHttpService implements PixivService {
     try {
       final headers = {
         ..._buildBaseHeaders(includeAppHeaders: false),
-        'Authorization': '${credentials.tokenType} ${credentials.accessToken}',
+        'Authorization': 'Bearer ${credentials.accessToken}',
       };
       if (uri != null) {
         response = await _dio.getUri<Map<String, dynamic>>(
@@ -153,7 +154,7 @@ class PixivHttpService implements PixivService {
         final refreshed = await _refreshCredentials(credentials);
         final retryHeaders = {
           ..._buildBaseHeaders(includeAppHeaders: false),
-          'Authorization': '${refreshed.tokenType} ${refreshed.accessToken}',
+          'Authorization': 'Bearer ${refreshed.accessToken}',
         };
         if (uri != null) {
           response = await _dio.getUri<Map<String, dynamic>>(
