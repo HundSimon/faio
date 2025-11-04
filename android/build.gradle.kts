@@ -1,5 +1,4 @@
 import com.android.build.gradle.LibraryExtension
-import org.gradle.kotlin.dsl.findByType
 
 allprojects {
     repositories {
@@ -22,12 +21,15 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 subprojects {
-    if (name == "isar_flutter_libs") {
-        plugins.withId("com.android.library") {
-            extensions.configure<LibraryExtension> {
-                if (namespace.isNullOrBlank()) {
-                    namespace = "com.isar.flutter.libs"
-                }
+    plugins.withId("com.android.library") {
+        extensions.configure<LibraryExtension> {
+            val desiredSdk = 34
+            compileSdk = desiredSdk
+            defaultConfig {
+                targetSdk = desiredSdk
+            }
+            if (name == "isar_flutter_libs" && namespace.isNullOrBlank()) {
+                namespace = "com.isar.flutter.libs"
             }
         }
     }
