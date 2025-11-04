@@ -3,9 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+import 'package:uni_links/uni_links.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/pixiv/pixiv_auth.dart';
 import '../../../data/pixiv/pixiv_auth_flow.dart';
@@ -19,11 +18,10 @@ class PixivLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
-  late final WebViewController _controller;
-  final WebViewCookieManager _cookieManager = WebViewCookieManager();
   PixivLoginSession? _session;
+  StreamSubscription<Uri?>? _linkSubscription;
   bool _isInitializing = true;
-  bool _isPageLoading = false;
+  bool _isLaunching = false;
   bool _isExchanging = false;
   bool _handledAuthorization = false;
   String? _errorMessage;
@@ -31,156 +29,68 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
   @override
   void initState() {
     super.initState();
-    final params = const PlatformWebViewControllerCreationParams();
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      _controller = WebViewController.fromPlatformCreationParams(
-        AndroidWebViewControllerCreationParams.fromPlatformWebViewControllerCreationParams(
-          params,
-        ),
-      );
-    } else {
-      _controller = WebViewController.fromPlatformCreationParams(params);
-    }
-
-    _controller
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: _handleNavigationRequest,
-          onWebResourceError: _handleWebError,
-          onHttpError: _handleHttpError,
-          onPageStarted: (_) => setState(() {
-            _isPageLoading = true;
-          }),
-          onPageFinished: (_) => setState(() {
-            _isPageLoading = false;
-          }),
-        ),
-      );
-
-    final platformController = _controller.platform;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      if (platformController is AndroidWebViewController) {
-        platformController.setMediaPlaybackRequiresUserGesture(false);
-        final platformCookieManager = _cookieManager.platform;
-        if (platformCookieManager is AndroidWebViewCookieManager) {
-          unawaited(
-            platformCookieManager.setAcceptThirdPartyCookies(
-              platformController,
-              true,
-            ),
-          );
-        }
-      }
-    }
+    _listenForLinks();
     _startLogin();
   }
 
-  NavigationDecision _handleNavigationRequest(NavigationRequest request) {
-    if (_handledAuthorization) {
-      return NavigationDecision.prevent;
-    }
-    final uri = Uri.tryParse(request.url);
-    if (uri != null && _isTrackingDomain(uri)) {
-      debugPrint('Blocking tracking navigation to ${uri.host}');
-      return NavigationDecision.prevent;
-    }
-    if (request.url.startsWith(PixivAuthFlow.redirectUri)) {
-      final redirectUri = uri ?? Uri.parse(request.url);
-      final code = redirectUri.queryParameters['code'];
-      if (code == null || code.isEmpty) {
-        setState(() {
-          _errorMessage = '未能获取授权码，请重试。';
-        });
-        return NavigationDecision.prevent;
-      }
-      _handledAuthorization = true;
-      _exchangeCode(code);
-      return NavigationDecision.prevent;
-    }
-    return NavigationDecision.navigate;
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
   }
 
-  void _handleWebError(WebResourceError error) {
-    String? failingUrl;
-    if (error is AndroidWebResourceError) {
-      failingUrl = error.failingUrl;
-    }
-    failingUrl ??= error.url;
-
-    final parsedFailingUri =
-        failingUrl != null ? Uri.tryParse(failingUrl) : null;
-    if (parsedFailingUri != null && _isTrackingDomain(parsedFailingUri)) {
-      debugPrint(
-        'Ignoring tracking resource error (${error.errorCode}) for $failingUrl',
-      );
-      return;
-    }
-
-    debugPrint(
-      'Pixiv login WebView error (${error.errorCode}): ${error.description} '
-      'url=$failingUrl',
+  void _listenForLinks() {
+    _linkSubscription = uriLinkStream.listen(
+      (Uri? uri) {
+        if (!mounted || uri == null) {
+          return;
+        }
+        _handleIncomingUri(uri);
+      },
+      onError: (Object error) {
+        debugPrint('Pixiv login link stream error: $error');
+      },
     );
-    setState(() {
-      final messageUrl = failingUrl ?? '';
-      _errorMessage = messageUrl.isEmpty
-          ? '加载失败：${error.description}'
-          : '加载失败：${error.description}\n地址：$messageUrl';
-    });
-  }
 
-  void _handleHttpError(HttpResponseError error) {
-    final request = error.request;
-    final response = error.response;
-    final url = request?.uri.toString();
-    final status = response?.statusCode ?? -1;
-    if (status == 400) {
-      debugPrint('Pixiv login HTTP 400 for url=$url');
-    } else {
-      debugPrint('Pixiv login HTTP error $status for url=$url');
-    }
-    setState(() {
-      final messageUrl = url ?? '';
-      _errorMessage = messageUrl.isEmpty
-          ? '加载失败：HTTP $status'
-          : '加载失败：HTTP $status\n地址：$messageUrl';
+    // Handle the scenario where the app was launched by the callback link.
+    Future<void>(() async {
+      try {
+        final initialUri = await getInitialUri();
+        if (!mounted || initialUri == null) {
+          return;
+        }
+        _handleIncomingUri(initialUri);
+      } catch (error) {
+        debugPrint('Pixiv login initial link error: $error');
+      }
     });
-  }
-
-  bool _isTrackingDomain(Uri uri) {
-    final host = uri.host.toLowerCase();
-    return host.endsWith('googletagmanager.com') ||
-        host.endsWith('google-analytics.com') ||
-        host.endsWith('withgoogle.com');
   }
 
   Future<void> _startLogin() async {
     setState(() {
       _isInitializing = true;
       _errorMessage = null;
+      _handledAuthorization = false;
     });
+
     try {
       final flow = ref.read(pixivAuthFlowProvider);
       final session = await flow.createSession();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       _session = session;
-      await _cookieManager.clearCookies();
-      await _controller.setUserAgent(session.userAgent);
-      await _controller.loadRequest(session.loginUri, headers: {
-        'User-Agent': session.userAgent,
-        'Referer': 'https://app-api.pixiv.net/',
-        'X-Requested-With': 'com.pixiv.android',
-        'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN',
-      });
-      if (!mounted) return;
       setState(() {
         _isInitializing = false;
       });
+      if (_handledAuthorization) {
+        return;
+      }
+      await _launchLogin(session.loginUri);
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _isInitializing = false;
         _errorMessage = '无法启动 Pixiv 登录：$error';
@@ -188,11 +98,67 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
     }
   }
 
+  Future<void> _launchLogin(Uri uri) async {
+    setState(() {
+      _isLaunching = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        setState(() {
+          _errorMessage = '无法打开浏览器，请尝试手动复制链接。';
+        });
+      }
+    } catch (error) {
+      setState(() {
+        _errorMessage = '无法打开浏览器：$error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLaunching = false;
+        });
+      }
+    }
+  }
+
+  void _handleIncomingUri(Uri uri) {
+    if (_handledAuthorization) {
+      return;
+    }
+
+    if (!_isPixivCallback(uri)) {
+      return;
+    }
+
+    final code = uri.queryParameters['code'];
+    if (code == null || code.isEmpty) {
+      setState(() {
+        _errorMessage = '授权回调缺少 code，请重试。';
+      });
+      return;
+    }
+
+    _handledAuthorization = true;
+    _exchangeCode(code);
+  }
+
+  bool _isPixivCallback(Uri uri) {
+    return uri.scheme == 'https' &&
+        uri.host == 'app-api.pixiv.net' &&
+        uri.path == '/web/v1/users/auth/pixiv/callback';
+  }
+
   Future<void> _exchangeCode(String code) async {
     final session = _session;
     if (session == null) {
       setState(() {
-        _errorMessage = '登录会话失效，请重试。';
+        _errorMessage = '登录会话失效，请重新发起登录。';
         _handledAuthorization = false;
       });
       return;
@@ -206,11 +172,15 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
     try {
       final flow = ref.read(pixivAuthFlowProvider);
       final credentials = await flow.exchange(code: code, session: session);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ref.read(pixivAuthProvider.notifier).setCredentials(credentials);
       Navigator.of(context).pop(true);
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _isExchanging = false;
         _handledAuthorization = false;
@@ -222,41 +192,74 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    Widget body;
-    if (_errorMessage != null) {
-      body = Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _errorMessage!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: _startLogin, child: const Text('重试')),
-            ],
-          ),
-        ),
-      );
-    } else if (_isInitializing) {
-      body = const Center(child: CircularProgressIndicator());
-    } else {
-      body = WebViewWidget(controller: _controller);
-    }
+    final session = _session;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Pixiv 登录')),
       body: Stack(
         children: [
-          Positioned.fill(child: body),
-          if (_isPageLoading && !_isInitializing && _errorMessage == null)
-            const LinearProgressIndicator(minHeight: 2),
+          ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                '将在系统浏览器中打开 Pixiv 登录。请完成登录并授权后，系统会提示回到本应用。',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              if (_errorMessage != null) ...[
+                Card(
+                  color: theme.colorScheme.errorContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      _errorMessage!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (_isInitializing)
+                const Center(child: CircularProgressIndicator())
+              else ...[
+                FilledButton.icon(
+                  onPressed:
+                      session == null || _isLaunching ? null : () => _launchLogin(session.loginUri),
+                  icon: const Icon(Icons.open_in_browser),
+                  label: Text(_isLaunching ? '正在打开浏览器…' : '在浏览器中打开登录页'),
+                ),
+                const SizedBox(height: 12),
+                if (session != null) ...[
+                  Text(
+                    '如果浏览器未自动打开，可复制以下链接手动访问：',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    session.loginUrl,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 24),
+              Text(
+                '注意事项：\n'
+                '1. 如果出现安全验证，请完成验证后继续。\n'
+                '2. 如未返回应用，请在浏览器完成授权后手动切换回本应用。\n'
+                '3. 若仍无法完成登录，可在登录页重新发起流程。',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton(
+                onPressed: _isInitializing || _isLaunching ? null : _startLogin,
+                child: const Text('重新发起登录流程'),
+              ),
+            ],
+          ),
           if (_isExchanging)
             Container(
               color: Colors.black45,
