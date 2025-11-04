@@ -20,6 +20,11 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+val namespaceOverrides = mapOf(
+    "isar_flutter_libs" to "com.isar.flutter.libs",
+    "uni_links" to "dev.faio.uni_links",
+)
+
 subprojects {
     plugins.withId("com.android.library") {
         extensions.configure<LibraryExtension> {
@@ -28,8 +33,9 @@ subprojects {
             defaultConfig {
                 targetSdk = desiredSdk
             }
-            if (name == "isar_flutter_libs" && namespace.isNullOrBlank()) {
-                namespace = "com.isar.flutter.libs"
+            if (namespace.isNullOrBlank()) {
+                namespace = namespaceOverrides[name]
+                    ?: "dev.faio.generated.${name.replace('-', '_')}"
             }
         }
     }

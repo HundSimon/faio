@@ -25,6 +25,7 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
   bool _isExchanging = false;
   bool _handledAuthorization = false;
   String? _errorMessage;
+  final TextEditingController _manualCodeController = TextEditingController();
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
   @override
   void dispose() {
     _linkSubscription?.cancel();
+    _manualCodeController.dispose();
     super.dispose();
   }
 
@@ -132,26 +134,45 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
       return;
     }
 
-    if (!_isPixivCallback(uri)) {
+    if (_isPixivCallback(uri)) {
+      final code = uri.queryParameters['code'];
+      if (code == null || code.isEmpty) {
+        setState(() {
+          _errorMessage = '授权回调缺少 code，请重试。';
+        });
+        return;
+      }
+      _handledAuthorization = true;
+      _exchangeCode(code);
       return;
     }
 
-    final code = uri.queryParameters['code'];
-    if (code == null || code.isEmpty) {
-      setState(() {
-        _errorMessage = '授权回调缺少 code，请重试。';
-      });
-      return;
+    if (_isPixivPostRedirect(uri)) {
+      final redirect = uri.queryParameters['return_to'];
+      if (redirect != null) {
+        final redirectUri = Uri.tryParse(redirect);
+        if (redirectUri != null) {
+          _handleIncomingUri(redirectUri);
+          return;
+        }
+      }
     }
 
-    _handledAuthorization = true;
-    _exchangeCode(code);
+    setState(() {
+      _errorMessage = '收到未识别的回调：$uri';
+    });
   }
 
   bool _isPixivCallback(Uri uri) {
     return uri.scheme == 'https' &&
         uri.host == 'app-api.pixiv.net' &&
         uri.path == '/web/v1/users/auth/pixiv/callback';
+  }
+
+  bool _isPixivPostRedirect(Uri uri) {
+    return uri.scheme == 'https' &&
+        uri.host == 'accounts.pixiv.net' &&
+        uri.path == '/post-redirect';
   }
 
   Future<void> _exchangeCode(String code) async {
@@ -193,6 +214,7 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final session = _session;
+    final isReady = !_isInitializing && session != null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Pixiv 登录')),
@@ -244,6 +266,47 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 24),
+                Text(
+                  '若浏览器未弹出“返回应用”提示，请在登录完成后手动复制地址栏中的回调链接（或 code 参数）并粘贴到下方：',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _manualCodeController,
+                  enabled: isReady && !_isExchanging,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '回调链接或 code',
+                    hintText: '例如：https://app-api.pixiv.net/...&code=XXXX',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonal(
+                  onPressed: isReady && !_isExchanging
+                      ? () {
+                          final raw = _manualCodeController.text.trim();
+                          if (raw.isEmpty) {
+                            setState(() {
+                              _errorMessage = '请输入授权回调链接或 code。';
+                            });
+                            return;
+                          }
+                          final uri = Uri.tryParse(raw);
+                          final code = uri?.queryParameters['code'] ?? raw;
+                          if (code.isEmpty) {
+                            setState(() {
+                              _errorMessage = '未能识别 code，请检查后重试。';
+                            });
+                            return;
+                          }
+                          _handledAuthorization = true;
+                          _exchangeCode(code);
+                        }
+                      : null,
+                  child: const Text('提交授权码'),
+                ),
               ],
               const SizedBox(height: 24),
               Text(
