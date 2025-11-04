@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../../core/network/rate_limiter.dart';
-import 'e621_auth.dart';
 import 'e621_credentials.dart';
 import 'e621_service.dart';
 import 'models/e621_post.dart';

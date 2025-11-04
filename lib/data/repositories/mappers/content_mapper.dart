@@ -1,5 +1,6 @@
 import '../../../domain/models/content_item.dart';
 import '../../e621/models/e621_post.dart';
+import '../../pixiv/models/pixiv_models.dart';
 
 class ContentMapper {
   const ContentMapper._();
@@ -62,4 +63,138 @@ class ContentMapper {
     }
     return ContentType.illustration;
   }
+
+  static FaioContent? fromPixivIllust(PixivIllust illust) {
+    final previewImage =
+        illust.imageUrls.squareMedium ??
+        illust.imageUrls.medium ??
+        illust.imageUrls.large ??
+        illust.metaPages.firstOrNull?.imageUrls.medium;
+    final sampleImage =
+        illust.imageUrls.large ??
+        illust.metaPages.firstOrNull?.imageUrls.large ??
+        illust.imageUrls.medium;
+    final originalImage =
+        illust.originalImageUrl ??
+        illust.imageUrls.original ??
+        illust.metaPages.firstOrNull?.imageUrls.original;
+
+    if (previewImage == null && sampleImage == null) {
+      return null;
+    }
+
+    final aspectRatio = _pixivAspectRatio(illust);
+    final rating = _pixivRating(illust.xRestrict, illust.sanityLevel);
+    final tags = _pixivTagNames(illust.tags);
+    final summary = illust.caption.trim();
+    final type = switch (illust.type) {
+      PixivIllustType.manga => ContentType.comic,
+      _ => ContentType.illustration,
+    };
+
+    return FaioContent(
+      id: 'pixiv:${illust.id}',
+      source: 'pixiv',
+      title: illust.title.trim().isEmpty ? 'Untitled' : illust.title.trim(),
+      summary: summary,
+      type: type,
+      previewUrl: previewImage ?? sampleImage,
+      sampleUrl: sampleImage,
+      originalUrl: originalImage,
+      previewAspectRatio: aspectRatio,
+      publishedAt: illust.createDate,
+      updatedAt: illust.updateDate,
+      rating: rating,
+      authorName: illust.user.name.isEmpty ? null : illust.user.name,
+      tags: tags,
+      favoriteCount: illust.totalBookmarks,
+      sourceLinks: [
+        Uri.parse('https://www.pixiv.net/artworks/${illust.id}'),
+      ],
+    );
+  }
+
+  static FaioContent? fromPixivNovel(PixivNovel novel) {
+    final previewImage =
+        novel.coverImageUrls.medium ??
+        novel.coverImageUrls.large ??
+        novel.coverImageUrls.squareMedium;
+
+    final summary = novel.caption.trim();
+    final tags = _pixivTagNames(novel.tags);
+
+    return FaioContent(
+      id: 'pixiv_novel:${novel.id}',
+      source: 'pixiv',
+      title: novel.title.trim().isEmpty ? 'Untitled' : novel.title.trim(),
+      summary: summary,
+      type: ContentType.novel,
+      previewUrl: previewImage,
+      sampleUrl: novel.coverImageUrls.large ?? previewImage,
+      originalUrl: novel.coverImageUrls.original ?? novel.coverImageUrls.large,
+      previewAspectRatio: null,
+      publishedAt: novel.createDate,
+      updatedAt: novel.updateDate,
+      rating: 'General',
+      authorName: novel.user.name.isEmpty ? null : novel.user.name,
+      tags: tags,
+      favoriteCount: novel.totalBookmarks,
+      sourceLinks: [
+        Uri.parse('https://www.pixiv.net/novel/show.php?id=${novel.id}'),
+      ],
+    );
+  }
+
+  static double? _pixivAspectRatio(PixivIllust illust) {
+    if (illust.width > 0 && illust.height > 0) {
+      return illust.width / illust.height;
+    }
+    final firstPage = illust.metaPages.firstOrNull;
+    final width = firstPage?.width ?? 0;
+    final height = firstPage?.height ?? 0;
+    if (width > 0 && height > 0) {
+      return width / height;
+    }
+    return null;
+  }
+
+  static String _pixivRating(int? xRestrict, int? sanityLevel) {
+    if (xRestrict != null) {
+      if (xRestrict <= 0) {
+        return 'General';
+      }
+      if (xRestrict == 1) {
+        return 'Mature';
+      }
+      return 'Adult';
+    }
+    if (sanityLevel != null) {
+      if (sanityLevel <= 2) {
+        return 'General';
+      }
+      if (sanityLevel <= 4) {
+        return 'Mature';
+      }
+      return 'Adult';
+    }
+    return 'General';
+  }
+
+  static List<String> _pixivTagNames(List<PixivTag> tags) {
+    final names = <String>{};
+    for (final tag in tags) {
+      if (tag.name.isNotEmpty) {
+        names.add(tag.name);
+      }
+      final translated = tag.translatedName;
+      if (translated != null && translated.isNotEmpty) {
+        names.add(translated);
+      }
+    }
+    return names.toList();
+  }
+}
+
+extension on List<PixivMetaPage> {
+  PixivMetaPage? get firstOrNull => isEmpty ? null : this[0];
 }

@@ -6,6 +6,17 @@ import 'package:faio/domain/models/content_item.dart';
 import '../providers/feed_providers.dart';
 import 'illustration_gallery_screen.dart';
 
+Map<String, String>? _imageHeadersFor(FaioContent content) {
+  final source = content.source.toLowerCase();
+  if (source.startsWith('pixiv')) {
+    return const {
+      'Referer': 'https://app-api.pixiv.net/',
+      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
+    };
+  }
+  return null;
+}
+
 class IllustrationDetailScreen extends ConsumerStatefulWidget {
   const IllustrationDetailScreen({required this.initialIndex, super.key});
 
@@ -98,14 +109,14 @@ class _IllustrationDetailScreenState
       );
     }
 
-    FaioContent? content;
+    FaioContent? maybeContent;
     if (_currentIndex < feedState.items.length) {
-      content = feedState.items[_currentIndex];
+      maybeContent = feedState.items[_currentIndex];
     } else if (feedState.hasMore) {
       _ensureIndexLoaded();
     }
 
-    if (content == null) {
+    if (maybeContent == null) {
       final isLoading = feedState.isLoadingInitial || feedState.isLoadingMore;
       return Scaffold(
         appBar: AppBar(),
@@ -117,6 +128,7 @@ class _IllustrationDetailScreenState
       );
     }
 
+    final content = maybeContent;
     final aspectRatio = content.previewAspectRatio ?? 1;
     final hasSummary = content.summary.trim().isNotEmpty;
     final detailImageUrl = content.sampleUrl ?? content.previewUrl;
@@ -171,6 +183,7 @@ class _IllustrationDetailScreenState
                       child: Image.network(
                         detailImageUrl.toString(),
                         fit: BoxFit.cover,
+                        headers: _imageHeadersFor(content),
                         errorBuilder: (_, __, ___) =>
                             placeholder(Icons.broken_image),
                         loadingBuilder: (context, child, loadingProgress) {
@@ -184,6 +197,7 @@ class _IllustrationDetailScreenState
                                 Image.network(
                                   fallbackPreviewUrl.toString(),
                                   fit: BoxFit.cover,
+                                  headers: _imageHeadersFor(content),
                                   errorBuilder: (_, __, ___) =>
                                       placeholder(Icons.broken_image),
                                 ),

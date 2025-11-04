@@ -2,11 +2,16 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../data/repositories/content_repository_impl.dart';
 import '../../../domain/models/content_item.dart';
-import '../../../domain/repositories/content_repository.dart';
+import '../../../domain/models/content_page.dart';
 
 const _pageSize = 30;
+
+typedef FeedPageFetcher =
+    Future<ContentPageResult> Function(int page, int limit);
+typedef FeedItemFilter = bool Function(FaioContent item);
 
 class FeedState {
   const FeedState({
@@ -51,28 +56,32 @@ class FeedState {
 }
 
 class FeedController extends StateNotifier<FeedState> {
-  FeedController({required ContentRepository repository, required this.ref})
-    : _repository = repository,
+  FeedController({required FeedPageFetcher fetchPage, FeedItemFilter? filter})
+    : _fetchPage = fetchPage,
+      _filter = filter ?? _defaultFilter,
       super(const FeedState()) {
     _loadInitial();
   }
 
-  final ContentRepository _repository;
-  final Ref ref;
+  final FeedPageFetcher _fetchPage;
+  final FeedItemFilter _filter;
+
+  static bool _defaultFilter(FaioContent item) => true;
 
   Future<void> _loadInitial() async {
     state = state.copyWith(isLoadingInitial: true, lastError: null);
 
     try {
-      final firstPage = await _fetchPage(1);
+      final firstPage = await _fetchPage(1, _pageSize);
       if (!mounted) return;
 
-      final seen = firstPage.map((item) => item.id).toSet();
+      final filtered = firstPage.items.where(_filter).toList();
+      final seen = filtered.map((item) => item.id).toSet();
 
       state = state.copyWith(
-        items: firstPage,
-        currentPage: firstPage.isEmpty ? 0 : 1,
-        hasMore: firstPage.length >= _pageSize,
+        items: filtered,
+        currentPage: firstPage.page,
+        hasMore: firstPage.hasMore,
         isLoadingInitial: false,
         seenIds: seen,
         lastError: null,
@@ -81,13 +90,6 @@ class FeedController extends StateNotifier<FeedState> {
       if (!mounted) return;
       state = state.copyWith(isLoadingInitial: false, lastError: error);
     }
-  }
-
-  Future<List<FaioContent>> _fetchPage(int page) async {
-    final items = await _repository.fetchFeedPage(page: page, limit: _pageSize);
-    return items
-        .where((item) => item.type == ContentType.illustration)
-        .toList();
   }
 
   Future<void> refresh() async {
@@ -105,11 +107,12 @@ class FeedController extends StateNotifier<FeedState> {
 
     try {
       final nextPage = max(current.currentPage, 1) + 1;
-      final newItems = await _fetchPage(nextPage);
+      final result = await _fetchPage(nextPage, _pageSize);
       if (!mounted) return;
 
       final latest = state;
-      final unique = newItems
+      final filtered = result.items.where(_filter).toList();
+      final unique = filtered
           .where((item) => !latest.seenIds.contains(item.id))
           .toList();
 
@@ -118,8 +121,8 @@ class FeedController extends StateNotifier<FeedState> {
 
       state = latest.copyWith(
         items: updatedItems,
-        currentPage: nextPage,
-        hasMore: newItems.length >= _pageSize,
+        currentPage: result.page,
+        hasMore: result.hasMore,
         isLoadingMore: false,
         seenIds: updatedSeen,
         lastError: null,
@@ -140,7 +143,6 @@ class FeedController extends StateNotifier<FeedState> {
         break;
       }
       if (state.items.length == previousLength) {
-        // Prevent potential infinite loop if no new illustrations are found.
         if (attempts >= 3) {
           break;
         }
@@ -154,8 +156,41 @@ class FeedController extends StateNotifier<FeedState> {
 final feedControllerProvider =
     StateNotifierProvider.autoDispose<FeedController, FeedState>((ref) {
       final repository = ref.watch(contentRepositoryProvider);
-      return FeedController(repository: repository, ref: ref);
-    });
+      return FeedController(
+        fetchPage: (page, limit) async {
+          final items = await repository.fetchFeedPage(
+            page: page,
+            limit: limit,
+          );
+          return ContentPageResult(
+            items: items,
+            page: page,
+            hasMore: items.length >= limit,
+          );
+        },
+        filter: (item) => item.type == ContentType.illustration,
+      );
+    }, name: 'feedControllerProvider');
+
+final pixivMangaFeedControllerProvider =
+    StateNotifierProvider.autoDispose<FeedController, FeedState>((ref) {
+      final repository = ref.watch(pixivRepositoryProvider);
+      return FeedController(
+        fetchPage: (page, limit) =>
+            repository.fetchManga(page: page, limit: limit),
+        filter: (item) => item.type == ContentType.comic,
+      );
+    }, name: 'pixivMangaFeedControllerProvider');
+
+final pixivNovelFeedControllerProvider =
+    StateNotifierProvider.autoDispose<FeedController, FeedState>((ref) {
+      final repository = ref.watch(pixivRepositoryProvider);
+      return FeedController(
+        fetchPage: (page, limit) =>
+            repository.fetchNovels(page: page, limit: limit),
+        filter: (item) => item.type == ContentType.novel,
+      );
+    }, name: 'pixivNovelFeedControllerProvider');
 
 final feedSelectionProvider =
     StateNotifierProvider.autoDispose<
@@ -163,7 +198,7 @@ final feedSelectionProvider =
       FeedSelectionState
     >((ref) {
       return FeedSelectionController();
-    });
+    }, name: 'feedSelectionProvider');
 
 class FeedSelectionState {
   const FeedSelectionState({this.selectedIndex, this.pendingScrollIndex});

@@ -4,17 +4,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/content_item.dart';
 import '../../domain/repositories/content_repository.dart';
+import '../../domain/repositories/pixiv_repository.dart';
 import '../e621/e621_auth.dart';
 import '../e621/e621_credentials.dart';
 import '../e621/e621_providers.dart';
 import '../e621/e621_service.dart';
+import '../pixiv/pixiv_auth.dart';
+import '../pixiv/pixiv_credentials.dart';
+import '../pixiv/pixiv_providers.dart';
 import 'mappers/content_mapper.dart';
 
 class ContentRepositoryImpl implements ContentRepository {
-  ContentRepositoryImpl({required E621Service e621Service})
-    : _e621Service = e621Service;
+  ContentRepositoryImpl({
+    required E621Service e621Service,
+    required PixivRepository pixivRepository,
+  }) : _e621Service = e621Service,
+       _pixivRepository = pixivRepository;
 
   final E621Service _e621Service;
+  final PixivRepository _pixivRepository;
 
   final StreamController<List<FaioContent>> _controller =
       StreamController<List<FaioContent>>.broadcast();
@@ -51,16 +59,54 @@ class ContentRepositoryImpl implements ContentRepository {
         .where((tag) => tag.isNotEmpty)
         .toList(growable: false);
 
-    final posts = await _e621Service.fetchPosts(
-      page: page,
-      limit: limit,
-      tags: normalizedTags,
+    final sources = <Future<List<FaioContent>>>[];
+    final sourceErrors = <Object>[];
+    final sourceStacks = <StackTrace>[];
+
+    Future<List<FaioContent>> safeFetch(
+      Future<List<FaioContent>> Function() fetch,
+    ) async {
+      try {
+        return await fetch();
+      } catch (error, stackTrace) {
+        sourceErrors.add(error);
+        sourceStacks.add(stackTrace);
+        return const [];
+      }
+    }
+
+    sources.add(
+      safeFetch(
+        () => _fetchE621(page: page, limit: limit, tags: normalizedTags),
+      ),
     );
 
-    final items =
-        posts.map(ContentMapper.fromE621).whereType<FaioContent>().toList();
-    items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    return items;
+    sources.add(safeFetch(() => _fetchPixiv(page: page, limit: limit)));
+
+    final results = await Future.wait(sources);
+
+    final combined = results.expand((list) => list).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+
+    final deduped = <FaioContent>[];
+    final seenIds = <String>{};
+    for (final item in combined) {
+      if (item.type != ContentType.illustration) {
+        continue;
+      }
+      if (seenIds.add(item.id)) {
+        deduped.add(item);
+      }
+    }
+
+    if (deduped.isEmpty && sourceErrors.isNotEmpty) {
+      Error.throwWithStackTrace(sourceErrors.first, sourceStacks.first);
+    }
+
+    if (deduped.length > limit) {
+      return deduped.sublist(0, limit);
+    }
+    return deduped;
   }
 
   @override
@@ -76,8 +122,10 @@ class ContentRepositoryImpl implements ContentRepository {
     final normalizedTags = tags.toList();
     if (normalizedTags.isNotEmpty) {
       final posts = await _e621Service.fetchPosts(tags: normalizedTags);
-      final items =
-          posts.map(ContentMapper.fromE621).whereType<FaioContent>().toList();
+      final items = posts
+          .map(ContentMapper.fromE621)
+          .whereType<FaioContent>()
+          .toList();
       items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
       return items;
     }
@@ -94,12 +142,50 @@ class ContentRepositoryImpl implements ContentRepository {
   void dispose() {
     _controller.close();
   }
+
+  Future<List<FaioContent>> _fetchE621({
+    required int page,
+    required int limit,
+    required List<String> tags,
+  }) async {
+    final posts = await _e621Service.fetchPosts(
+      page: page,
+      limit: limit,
+      tags: tags,
+    );
+
+    return posts
+        .map(ContentMapper.fromE621)
+        .whereType<FaioContent>()
+        .where((item) => item.type == ContentType.illustration)
+        .toList();
+  }
+
+  Future<List<FaioContent>> _fetchPixiv({
+    required int page,
+    required int limit,
+  }) async {
+    final result = await _pixivRepository.fetchIllustrations(
+      page: page,
+      limit: limit,
+    );
+    return result.items
+        .where((item) => item.type == ContentType.illustration)
+        .toList();
+  }
 }
 
 final contentRepositoryProvider = Provider<ContentRepository>((ref) {
   final e621Service = ref.watch(e621ServiceProvider);
-  final repository = ContentRepositoryImpl(e621Service: e621Service);
+  final pixivRepository = ref.watch(pixivRepositoryProvider);
+  final repository = ContentRepositoryImpl(
+    e621Service: e621Service,
+    pixivRepository: pixivRepository,
+  );
   ref.listen<E621Credentials?>(e621AuthProvider, (previous, next) {
+    unawaited(repository.refreshFeed());
+  });
+  ref.listen<PixivCredentials?>(pixivAuthProvider, (previous, next) {
     unawaited(repository.refreshFeed());
   });
   ref.onDispose(repository.dispose);

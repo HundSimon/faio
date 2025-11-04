@@ -5,6 +5,17 @@ import 'package:faio/domain/models/content_item.dart';
 
 import '../providers/feed_providers.dart';
 
+Map<String, String>? _imageHeadersFor(FaioContent content) {
+  final source = content.source.toLowerCase();
+  if (source.startsWith('pixiv')) {
+    return const {
+      'Referer': 'https://app-api.pixiv.net/',
+      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
+    };
+  }
+  return null;
+}
+
 class IllustrationGalleryScreen extends ConsumerStatefulWidget {
   const IllustrationGalleryScreen({required this.initialIndex, super.key});
 
@@ -101,6 +112,7 @@ class _IllustrationGalleryScreenState
                     child: Image.network(
                       imageUrl.toString(),
                       fit: BoxFit.contain,
+                      headers: _imageHeadersFor(item),
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) {
                           return child;
