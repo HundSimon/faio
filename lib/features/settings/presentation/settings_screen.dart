@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/e621/e621_auth.dart';
 import '../../../data/pixiv/pixiv_auth.dart';
 import '../../../data/pixiv/pixiv_providers.dart';
+import 'pixiv_login_screen.dart';
 
 /// Settings hub with placeholders for upcoming configuration panels.
 class SettingsScreen extends ConsumerWidget {
@@ -37,14 +38,33 @@ class SettingsScreen extends ConsumerWidget {
           Card(
             child: ListTile(
               title: const Text('Pixiv 凭证'),
-              subtitle: Text(
-                pixivCredentials == null
-                    ? '未配置，将使用示例内容'
-                    : '刷新令牌已配置，访问令牌到期：${_formatExpiry(pixivCredentials.expiresAt)}',
-              ),
-              trailing: TextButton(
-                onPressed: () => _editPixivCredentials(context, ref),
-                child: const Text('配置'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pixivCredentials == null
+                        ? '未配置，将使用示例内容'
+                        : '刷新令牌已配置，访问令牌到期：${_formatExpiry(pixivCredentials.expiresAt)}',
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonal(
+                        onPressed: () => _startPixivLogin(context, ref),
+                        child: const Text('登录获取'),
+                      ),
+                      TextButton(
+                        onPressed: () => _editPixivCredentialsManual(
+                          context,
+                          ref,
+                        ),
+                        child: const Text('手动录入'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -151,7 +171,21 @@ class SettingsScreen extends ConsumerWidget {
     apiKeyController.dispose();
   }
 
-  Future<void> _editPixivCredentials(
+  Future<void> _startPixivLogin(BuildContext context, WidgetRef ref) async {
+    final success = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const PixivLoginScreen(),
+        fullscreenDialog: true,
+      ),
+    );
+    if (success == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已完成 Pixiv 登录')),
+      );
+    }
+  }
+
+  Future<void> _editPixivCredentialsManual(
     BuildContext context,
     WidgetRef ref,
   ) async {

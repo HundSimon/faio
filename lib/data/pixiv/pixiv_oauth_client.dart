@@ -8,19 +8,14 @@ class PixivOAuthClient {
 
   static final BaseOptions _defaultOptions = BaseOptions(
     baseUrl: 'https://oauth.secure.pixiv.net',
-    headers: const {
-      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
-      'Accept-Language': 'zh-CN',
-      'App-OS': 'android',
-      'App-OS-Version': '11',
-      'App-Version': '5.0.234',
-    },
     connectTimeout: const Duration(seconds: 20),
     receiveTimeout: const Duration(seconds: 20),
   );
 
   static const _clientId = 'MOBrBDS8blbauoSck0ZfDbtuzpyT';
   static const _clientSecret = 'lsACyCD94FhDUtqbr1PW4eB6YQWA';
+  static const _redirectUri =
+      'https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback';
 
   final Dio _dio;
 
@@ -37,9 +32,51 @@ class PixivOAuthClient {
       options: Options(contentType: Headers.formUrlEncodedContentType),
     );
 
-    final data = response.data ?? const {};
+    return _parseCredentials(response.data ?? const {}, refreshToken);
+  }
+
+  Future<PixivCredentials> authorize({
+    required String code,
+    required String codeVerifier,
+    required String userAgent,
+    required String appVersion,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/auth/token',
+      data: {
+        'client_id': _clientId,
+        'client_secret': _clientSecret,
+        'code': code,
+        'code_verifier': codeVerifier,
+        'grant_type': 'authorization_code',
+        'include_policy': 'true',
+        'redirect_uri': _redirectUri,
+      },
+      options: Options(
+        contentType: Headers.formUrlEncodedContentType,
+        headers: {
+          'User-Agent': userAgent,
+          'App-Version': appVersion,
+          'Accept-Language': 'zh-CN',
+          'App-OS': 'android',
+          'App-OS-Version': '11',
+        },
+      ),
+    );
+
+    return _parseCredentials(response.data ?? const {}, null);
+  }
+
+  PixivCredentials _parseCredentials(
+    Map<String, dynamic> data,
+    String? fallbackRefreshToken,
+  ) {
     final accessToken = data['access_token'] as String? ?? '';
-    final newRefreshToken = data['refresh_token'] as String? ?? refreshToken;
+    final refreshToken =
+        data['refresh_token'] as String? ?? fallbackRefreshToken ?? '';
+    if (refreshToken.isEmpty) {
+      throw StateError('Pixiv OAuth response missing refresh_token');
+    }
     final expiresIn = data['expires_in'] as int? ?? 0;
     final tokenType = data['token_type'] as String? ?? 'Bearer';
     final scopeRaw = data['scope'];
@@ -55,7 +92,7 @@ class PixivOAuthClient {
 
     return PixivCredentials(
       accessToken: accessToken,
-      refreshToken: newRefreshToken,
+      refreshToken: refreshToken,
       expiresAt: expiresAt,
       tokenType: tokenType,
       scope: scope,

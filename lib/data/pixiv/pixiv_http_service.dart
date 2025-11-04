@@ -22,26 +22,20 @@ class PixivHttpService implements PixivService {
     required Dio dio,
     required PixivOAuthClient oauthClient,
     required RateLimiter rateLimiter,
+    required String appVersion,
     PixivCredentials? credentials,
     void Function(PixivCredentials credentials)? onCredentialsRefreshed,
   }) : _dio = dio,
        _oauthClient = oauthClient,
        _rateLimiter = rateLimiter,
+       _appVersion = appVersion,
        _credentials = credentials,
        _onCredentialsRefreshed = onCredentialsRefreshed;
-
-  static const _defaultHeaders = <String, String>{
-    'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
-    'App-OS': 'android',
-    'App-OS-Version': '11',
-    'App-Version': '5.0.234',
-    'Accept-Language': 'zh-CN',
-    'Referer': 'https://app-api.pixiv.net/',
-  };
 
   final Dio _dio;
   final PixivOAuthClient _oauthClient;
   final RateLimiter _rateLimiter;
+  final String _appVersion;
   PixivCredentials? _credentials;
   Future<PixivCredentials>? _refreshingCredentials;
   final void Function(PixivCredentials credentials)? _onCredentialsRefreshed;
@@ -139,7 +133,7 @@ class PixivHttpService implements PixivService {
     Response<Map<String, dynamic>> response;
     try {
       final headers = {
-        ..._defaultHeaders,
+        ..._buildBaseHeaders(includeAppHeaders: false),
         'Authorization': '${credentials.tokenType} ${credentials.accessToken}',
       };
       if (uri != null) {
@@ -158,7 +152,7 @@ class PixivHttpService implements PixivService {
       if (_isAuthFailure(error)) {
         final refreshed = await _refreshCredentials(credentials);
         final retryHeaders = {
-          ..._defaultHeaders,
+          ..._buildBaseHeaders(includeAppHeaders: false),
           'Authorization': '${refreshed.tokenType} ${refreshed.accessToken}',
         };
         if (uri != null) {
@@ -217,5 +211,22 @@ class PixivHttpService implements PixivService {
     } finally {
       _refreshingCredentials = null;
     }
+  }
+
+  Map<String, String> _buildBaseHeaders({bool includeAppHeaders = true}) {
+    final headers = <String, String>{
+      'Accept-Language': 'zh-CN',
+      'Referer': 'https://app-api.pixiv.net/',
+    };
+    if (includeAppHeaders) {
+      final userAgent = 'PixivAndroidApp/$_appVersion (Android 11; Pixel 5)';
+      headers.addAll({
+        'User-Agent': userAgent,
+        'App-OS': 'android',
+        'App-OS-Version': '11',
+        'App-Version': _appVersion,
+      });
+    }
+    return headers;
   }
 }

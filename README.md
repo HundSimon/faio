@@ -24,9 +24,9 @@ Furry All In One 是一个聚合常见兽圈站点的 Flutter 客户端。目前
    - 运行应用后，前往 “设置 → e621 凭证” 填写用户名与 API Key。
 
 2. **Pixiv OAuth**
-   - 通过已知的 Pixiv OAuth 流程获取 `refresh_token`（常见做法：抓包移动端登录）；
-   - 打开 “设置 → Pixiv 凭证”，粘贴 refresh token；
-   - 应用会调用官方接口刷新 access token，并持久化在安全存储中；
+   - 支持在应用内走完整登录流程：进入 “设置 → Pixiv 凭证 → 登录获取”，浏览器控件会跳转至官方登录页并在授权后自动写入 refresh token；
+   - 仍可通过 “手动录入” 粘贴既有 refresh token；
+   - 登录过程中会自动查询最新 Pixiv Android 版本并更新所有请求头；
    - 未配置 pixiv 凭证时，信息流会退回本地示例数据。
 
 ### Pixiv 图片请求
