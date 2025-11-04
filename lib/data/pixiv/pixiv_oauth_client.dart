@@ -13,7 +13,7 @@ class PixivOAuthClient {
   );
 
   static const _clientId = 'MOBrBDS8blbauoSck0ZfDbtuzpyT';
-  static const _clientSecret = 'lsACyCD94FhDUtqbr1PW4eB6YQWA';
+  static const _clientSecret = 'lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj';
   static const _redirectUri =
       'https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback';
 
