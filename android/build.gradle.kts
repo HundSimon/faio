@@ -22,7 +22,6 @@ subprojects {
 }
 val namespaceOverrides = mapOf(
     "isar_flutter_libs" to "com.isar.flutter.libs",
-    "uni_links" to "dev.faio.uni_links",
 )
 
 subprojects {
