@@ -118,11 +118,14 @@ class FeedController extends StateNotifier<FeedState> {
 
       final updatedItems = [...latest.items, ...unique];
       final updatedSeen = {...latest.seenIds, ...unique.map((item) => item.id)};
+      final hasNewItems = unique.isNotEmpty;
+      // Stop paginating once the backend stops yielding unseen items to avoid endless spinners.
+      final nextHasMore = hasNewItems ? result.hasMore : false;
 
       state = latest.copyWith(
         items: updatedItems,
         currentPage: result.page,
-        hasMore: result.hasMore,
+        hasMore: nextHasMore,
         isLoadingMore: false,
         seenIds: updatedSeen,
         lastError: null,
