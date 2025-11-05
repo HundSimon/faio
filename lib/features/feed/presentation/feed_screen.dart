@@ -573,32 +573,50 @@ class _NovelListItem extends StatelessWidget {
     final theme = Theme.of(context);
     final previewUrl = item.previewUrl ?? item.sampleUrl;
     final aspectRatio = ((item.previewAspectRatio ?? 1.4).clamp(
-      0.5,
-      2.0,
+      0.2,
+      5.0,
     )).toDouble();
     final hasSummary = item.summary.trim().isNotEmpty;
 
+    const coverWidth = 120.0;
+    final portraitAspectRatio =
+        (aspectRatio > 1 ? 1 / aspectRatio : aspectRatio)
+            .clamp(0.45, 0.85)
+            .toDouble();
+    final summaryText = hasSummary ? item.summary : '暂无简介';
+    final authorName = item.authorName?.trim();
+    final hasAuthor = authorName?.isNotEmpty ?? false;
+    final cardColor = Color.alphaBlend(
+      theme.colorScheme.surfaceVariant.withOpacity(
+        theme.brightness == Brightness.dark ? 0.25 : 0.4,
+      ),
+      theme.colorScheme.surface,
+    );
+
     Widget buildImage() {
+      final borderRadius = BorderRadius.circular(12);
       if (previewUrl == null) {
-        return Container(
-          height: 160,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            Icons.menu_book,
-            color: theme.colorScheme.onSurfaceVariant,
+        return ClipRRect(
+          borderRadius: borderRadius,
+          child: AspectRatio(
+            aspectRatio: portraitAspectRatio,
+            child: Container(
+              color: theme.colorScheme.surfaceVariant,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.menu_book,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
         );
       }
       final urls = _imageUrlCandidates(previewUrl);
       final headers = _imageHeadersFor(item, url: previewUrl);
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: borderRadius,
         child: AspectRatio(
-          aspectRatio: aspectRatio,
+          aspectRatio: portraitAspectRatio,
           child: _ResilientNetworkImage(
             urls: urls,
             headers: headers,
@@ -619,55 +637,99 @@ class _NovelListItem extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 0,
-      color: theme.colorScheme.surface,
+      color: cardColor,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () {
           final messenger = ScaffoldMessenger.maybeOf(context);
           messenger?.showSnackBar(const SnackBar(content: Text('小说详情页开发中')));
         },
+        splashColor: theme.colorScheme.primary.withOpacity(0.08),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              buildImage(),
-              const SizedBox(height: 12),
-              Text(
-                item.title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+              SizedBox(
+                width: coverWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildImage(),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.favorite,
+                          size: 14,
+                          color: theme.colorScheme.tertiary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${item.favoriteCount}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                hasSummary ? item.summary : '暂无简介',
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: hasSummary
-                      ? theme.colorScheme.onSurface
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: item.tags.take(6).map((tag) {
-                  return Chip(
-                    label: Text(tag),
-                    backgroundColor: theme.colorScheme.surfaceVariant,
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '收藏数：${item.favoriteCount}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (hasAuthor) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        authorName!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      summaryText,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: hasSummary
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (item.tags.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: item.tags.take(6).map((tag) {
+                          return Chip(
+                            label: Text(tag),
+                            backgroundColor: theme.colorScheme.surfaceVariant,
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
