@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -98,6 +100,50 @@ class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
       },
     );
   }
+}
+
+Future<void> _showAllTags(BuildContext context, List<String> tags) async {
+  if (tags.isEmpty) {
+    return;
+  }
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      final theme = Theme.of(sheetContext);
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '全部标签',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: tags
+                    .map(
+                      (tag) => Chip(
+                        label: Text(tag),
+                        backgroundColor: theme.colorScheme.surfaceVariant,
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class FeedScreen extends ConsumerWidget {
@@ -578,7 +624,6 @@ class _NovelListItem extends StatelessWidget {
     )).toDouble();
     final hasSummary = item.summary.trim().isNotEmpty;
 
-    const coverWidth = 120.0;
     final portraitAspectRatio =
         (aspectRatio > 1 ? 1 / aspectRatio : aspectRatio)
             .clamp(0.45, 0.85)
@@ -588,10 +633,46 @@ class _NovelListItem extends StatelessWidget {
     final hasAuthor = authorName?.isNotEmpty ?? false;
     final cardColor = Color.alphaBlend(
       theme.colorScheme.surfaceVariant.withOpacity(
-        theme.brightness == Brightness.dark ? 0.25 : 0.4,
+        theme.brightness == Brightness.dark ? 0.28 : 0.2,
       ),
       theme.colorScheme.surface,
     );
+    bool isAdultTag(String tag) {
+      final lowered = tag.toLowerCase();
+      return lowered.contains('r-18') ||
+          lowered.contains('r18') ||
+          lowered.contains('18禁');
+    }
+
+    final uniqueTags = <String>{};
+    final adultTags = <String>[];
+    final standardTags = <String>[];
+    for (final rawTag in item.tags) {
+      final tag = rawTag.trim();
+      if (tag.isEmpty || !uniqueTags.add(tag)) {
+        continue;
+      }
+      if (isAdultTag(tag)) {
+        adultTags.add(tag);
+      } else {
+        standardTags.add(tag);
+      }
+    }
+
+    final ratingLower = item.rating.toLowerCase();
+    final isAdultRated = ratingLower == 'adult';
+    final highlightAdult = isAdultRated || adultTags.isNotEmpty;
+    final adultBadgeLabel = adultTags.isNotEmpty
+        ? adultTags.first
+        : (isAdultRated ? 'R-18' : null);
+
+    const maxInlineTags = 4;
+    final visibleTags = standardTags.take(maxInlineTags).toList();
+    final overflowCount = math.max(0, standardTags.length - visibleTags.length);
+    final allTagsForSheet = <String>[
+      if (adultTags.isNotEmpty) ...adultTags else if (isAdultRated) 'R-18',
+      ...standardTags,
+    ];
 
     Widget buildImage() {
       final borderRadius = BorderRadius.circular(12);
@@ -636,7 +717,7 @@ class _NovelListItem extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 0,
+      elevation: 2,
       color: cardColor,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -649,90 +730,193 @@ class _NovelListItem extends StatelessWidget {
         splashColor: theme.colorScheme.primary.withOpacity(0.08),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: coverWidth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    buildImage(),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.favorite,
-                          size: 14,
-                          color: theme.colorScheme.tertiary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${item.favoriteCount}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = constraints.maxWidth;
+              final coverWidth = math.max(
+                120.0,
+                math.min(maxWidth * 0.32, 164.0),
+              );
+              final imageHeight = coverWidth / portraitAspectRatio;
+
+              Widget buildTagChip(
+                String label, {
+                bool isOverflow = false,
+                VoidCallback? onTap,
+              }) {
+                final foreground = isOverflow
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant;
+                final borderRadius = BorderRadius.circular(999);
+                final chip = Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: borderRadius,
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withOpacity(
+                        theme.brightness == Brightness.dark ? 0.5 : 0.25,
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                    color: isOverflow
+                        ? theme.colorScheme.primary.withOpacity(0.12)
+                        : Colors.transparent,
+                  ),
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: foreground,
+                      fontWeight: isOverflow ? FontWeight.w600 : null,
+                    ),
+                  ),
+                );
+                final wrappedChip = onTap != null
+                    ? InkWell(
+                        onTap: onTap,
+                        borderRadius: borderRadius,
+                        child: chip,
+                      )
+                    : chip;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: wrappedChip,
+                );
+              }
+
+              Widget buildMetaSection() {
+                final favorite = Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(
+                      Icons.favorite,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      item.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      '${item.favoriteCount}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
                         fontWeight: FontWeight.w600,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (hasAuthor) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        authorName!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(
-                      summaryText,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: hasSummary
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (item.tags.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: item.tags.take(6).map((tag) {
-                          return Chip(
-                            label: Text(tag),
-                            backgroundColor: theme.colorScheme.surfaceVariant,
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                          );
-                        }).toList(),
-                      ),
-                    ],
                   ],
-                ),
-              ),
-            ],
+                );
+
+                final badgeRowChildren = <Widget>[favorite];
+
+                if (highlightAdult) {
+                  badgeRowChildren.add(const SizedBox(width: 12));
+                  badgeRowChildren.add(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        adultBadgeLabel ?? 'R-18',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                final tagWidgets = <Widget>[
+                  for (final tag in visibleTags) buildTagChip(tag),
+                  if (overflowCount > 0)
+                    buildTagChip(
+                      '+$overflowCount',
+                      isOverflow: true,
+                      onTap: () => _showAllTags(context, allTagsForSheet),
+                    ),
+                ];
+
+                if (tagWidgets.isEmpty) {
+                  return Row(children: badgeRowChildren);
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: badgeRowChildren),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(children: tagWidgets),
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: coverWidth,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: SizedBox(height: imageHeight, child: buildImage()),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (hasAuthor) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                authorName!,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Text(
+                              summaryText,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: hasSummary
+                                    ? theme.colorScheme.onSurface
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        buildMetaSection(),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
