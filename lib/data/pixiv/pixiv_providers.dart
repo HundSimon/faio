@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/rate_limiter.dart';
 import '../../domain/repositories/pixiv_repository.dart';
+import '../furrynovel/furrynovel_providers.dart';
 import '../repositories/pixiv_repository_impl.dart';
 import 'pixiv_app_version.dart';
 import 'pixiv_auth.dart';
@@ -84,7 +85,11 @@ final pixivServiceProvider = Provider<PixivService>((ref) {
 
 final pixivRepositoryProvider = Provider<PixivRepository>((ref) {
   final service = ref.watch(pixivServiceProvider);
-  return PixivRepositoryImpl(service: service);
+  final furryNovelService = ref.watch(furryNovelServiceProvider);
+  return PixivRepositoryImpl(
+    service: service,
+    furryNovelService: furryNovelService,
+  );
 }, name: 'pixivRepositoryProvider');
 
 final pixivAuthFlowProvider = Provider<PixivAuthFlow>((ref) {

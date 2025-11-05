@@ -1,14 +1,20 @@
 import '../../domain/models/content_item.dart';
 import '../../domain/models/content_page.dart';
 import '../../domain/repositories/pixiv_repository.dart';
+import '../furrynovel/furrynovel_service.dart';
 import '../pixiv/models/pixiv_models.dart';
 import '../pixiv/pixiv_service.dart';
 import 'mappers/content_mapper.dart';
 
 class PixivRepositoryImpl implements PixivRepository {
-  PixivRepositoryImpl({required PixivService service}) : _service = service;
+  PixivRepositoryImpl({
+    required PixivService service,
+    required FurryNovelService furryNovelService,
+  })  : _service = service,
+        _furryNovelService = furryNovelService;
 
   final PixivService _service;
+  final FurryNovelService _furryNovelService;
 
   @override
   Future<ContentPageResult> fetchIllustrations({
@@ -61,19 +67,22 @@ class PixivRepositoryImpl implements PixivRepository {
     required int page,
     int limit = 30,
   }) async {
-    final offset = _offsetForPage(page, limit);
-    final response = await _service.fetchNovels(offset: offset, limit: limit);
-    final items = response.items
-        .map(ContentMapper.fromPixivNovel)
+    final result = await _furryNovelService.fetchLatestNovels(
+      page: page,
+      limit: limit,
+    );
+
+    final items = result.items
+        .map(ContentMapper.fromFurryNovel)
         .whereType<FaioContent>()
         .toList();
-    final hasMore = response.hasNextPage || items.length >= limit;
+    final hasMore = result.hasMore;
     return ContentPageResult(
       items: items,
       page: page,
       hasMore: hasMore,
-      nextOffset: response.nextOffset,
-      nextUrl: response.nextUrl,
+      nextOffset: hasMore ? (page + 1) * limit : null,
+      nextUrl: null,
     );
   }
 
@@ -88,11 +97,16 @@ class PixivRepositoryImpl implements PixivRepository {
 
   @override
   Future<FaioContent?> fetchNovelDetail(int novelId) async {
-    final novel = await _service.fetchNovelDetail(novelId);
-    if (novel == null) {
+    final furryNovel = await _furryNovelService.fetchNovel(novelId);
+    if (furryNovel != null) {
+      return ContentMapper.fromFurryNovel(furryNovel);
+    }
+
+    final pixivNovel = await _service.fetchNovelDetail(novelId);
+    if (pixivNovel == null) {
       return null;
     }
-    return ContentMapper.fromPixivNovel(novel);
+    return ContentMapper.fromPixivNovel(pixivNovel);
   }
 
   int _offsetForPage(int page, int limit) {

@@ -1,5 +1,6 @@
 import '../../../domain/models/content_item.dart';
 import '../../e621/models/e621_post.dart';
+import '../../furrynovel/models/furry_novel_models.dart';
 import '../../pixiv/models/pixiv_models.dart';
 
 class ContentMapper {
@@ -108,9 +109,7 @@ class ContentMapper {
       authorName: illust.user.name.isEmpty ? null : illust.user.name,
       tags: tags,
       favoriteCount: illust.totalBookmarks,
-      sourceLinks: [
-        Uri.parse('https://www.pixiv.net/artworks/${illust.id}'),
-      ],
+      sourceLinks: [Uri.parse('https://www.pixiv.net/artworks/${illust.id}')],
     );
   }
 
@@ -142,6 +141,49 @@ class ContentMapper {
       sourceLinks: [
         Uri.parse('https://www.pixiv.net/novel/show.php?id=${novel.id}'),
       ],
+    );
+  }
+
+  static FaioContent? fromFurryNovel(FurryNovel novel) {
+    final preview =
+        novel.coverUrl ??
+        novel.images.values
+            .map((image) => image.origin)
+            .firstWhere((uri) => uri != null, orElse: () => null);
+    final summary = novel.description.trim().isEmpty && novel.content != null
+        ? novel.content!.trim()
+        : novel.description.trim();
+    final authorName =
+        (novel.userName != null && novel.userName!.trim().isNotEmpty)
+        ? novel.userName!.trim()
+        : null;
+    final publishedAt =
+        novel.createDate ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final tags = novel.tags;
+    final rating = _furryNovelRating(tags);
+
+    final links = <Uri>[
+      Uri.parse('https://furrynovel.ink/pixiv/novel/${novel.id}'),
+      Uri.parse('https://www.pixiv.net/novel/show.php?id=${novel.id}'),
+    ];
+
+    return FaioContent(
+      id: 'furrynovel:${novel.id}',
+      source: 'furrynovel',
+      title: novel.title.trim().isEmpty ? 'Untitled' : novel.title.trim(),
+      summary: summary,
+      type: ContentType.novel,
+      previewUrl: preview,
+      sampleUrl: preview,
+      originalUrl: preview,
+      previewAspectRatio: null,
+      publishedAt: publishedAt,
+      updatedAt: publishedAt,
+      rating: rating,
+      authorName: authorName,
+      tags: tags,
+      favoriteCount: 0,
+      sourceLinks: links,
     );
   }
 
@@ -192,6 +234,17 @@ class ContentMapper {
       }
     }
     return names.toList();
+  }
+
+  static String _furryNovelRating(List<String> tags) {
+    final lowered = tags.map((tag) => tag.toLowerCase()).toList();
+    if (lowered.any((tag) => tag.contains('r-18') || tag.contains('r18'))) {
+      return 'Adult';
+    }
+    if (lowered.any((tag) => tag.contains('r-15') || tag.contains('r15'))) {
+      return 'Mature';
+    }
+    return 'General';
   }
 }
 

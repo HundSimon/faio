@@ -195,8 +195,6 @@ class FurryNovelImage {
       return null;
     }
 
-    return FurryNovelImage(
-      origin: parseUri(json['origin']),
-    );
+    return FurryNovelImage(origin: parseUri(json['origin']));
   }
 }

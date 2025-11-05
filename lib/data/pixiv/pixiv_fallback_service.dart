@@ -42,9 +42,15 @@ class PixivFallbackService implements PixivService {
     int limit = 30,
   }) async {
     try {
-      return await _primary.fetchNovels(offset: offset, limit: limit);
+      return await _primary.fetchNovels(
+        offset: offset,
+        limit: limit,
+      );
     } catch (_) {
-      return _fallback.fetchNovels(offset: offset, limit: limit);
+      return _fallback.fetchNovels(
+        offset: offset,
+        limit: limit,
+      );
     }
   }
 

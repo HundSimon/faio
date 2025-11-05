@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../core/network/rate_limiter.dart';
 import 'models/pixiv_models.dart';
@@ -87,13 +86,20 @@ class PixivHttpService implements PixivService {
   }) async {
     final response = await _getJson(
       path: '/v1/novel/recommended',
-      queryParameters: {'offset': offset},
+      queryParameters: {
+        'filter': 'for_android',
+        'include_ranking_label': 'true',
+        'include_privacy_policy': 'true',
+        'include_translated_tag_results': 'true',
+        'limit': limit,
+        'offset': offset,
+      },
     );
     final novels = parsePixivNovelList(response['novels']);
-    final nextUrl = response['next_url'] as String?;
+    final responseNextUrl = response['next_url'] as String?;
     return PixivPage<PixivNovel>(
       items: novels.take(limit).toList(),
-      nextUrl: nextUrl,
+      nextUrl: responseNextUrl,
     );
   }
 
