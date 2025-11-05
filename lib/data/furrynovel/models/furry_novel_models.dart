@@ -80,6 +80,7 @@ class FurryNovel {
     this.createDate,
     this.length,
     this.images = const {},
+    this.pixivLikeCount = 0,
   });
 
   final int id;
@@ -94,6 +95,7 @@ class FurryNovel {
   final DateTime? createDate;
   final int? length;
   final Map<String, FurryNovelImage> images;
+  final int pixivLikeCount;
 
   factory FurryNovel.fromJson(Map<String, dynamic> json) {
     Uri? parseUri(dynamic value) {
@@ -155,6 +157,7 @@ class FurryNovel {
       createDate: parseDate(json['createDate'] ?? json['create_date']),
       length: _parseFlexibleInt(json['length']),
       images: images,
+      pixivLikeCount: _parseFlexibleInt(json['pixivLikeCount']) ?? 0,
     );
   }
 }

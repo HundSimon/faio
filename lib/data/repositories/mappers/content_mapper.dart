@@ -182,7 +182,7 @@ class ContentMapper {
       rating: rating,
       authorName: authorName,
       tags: tags,
-      favoriteCount: 0,
+      favoriteCount: novel.pixivLikeCount,
       sourceLinks: links,
     );
   }
