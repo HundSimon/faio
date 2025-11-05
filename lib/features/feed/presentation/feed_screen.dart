@@ -6,15 +6,98 @@ import 'package:faio/domain/models/content_item.dart';
 
 import '../providers/feed_providers.dart';
 
-Map<String, String>? _imageHeadersFor(FaioContent item) {
+const _pixivFallbackHosts = ['i.pixiv.cat', 'i.pixiv.re', 'i.pixiv.nl'];
+
+Map<String, String>? _imageHeadersFor(FaioContent item, {Uri? url}) {
+  final resolvedUrl =
+      url ?? item.previewUrl ?? item.sampleUrl ?? item.originalUrl;
+  final host = resolvedUrl?.host.toLowerCase();
   final source = item.source.toLowerCase();
+
+  if (host != null && host.endsWith('pximg.net')) {
+    return const {
+      'Referer': 'https://www.pixiv.net/',
+      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
+    };
+  }
+
   if (source.startsWith('pixiv')) {
     return const {
       'Referer': 'https://app-api.pixiv.net/',
       'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
     };
   }
+
   return null;
+}
+
+List<Uri> _imageUrlCandidates(Uri url) {
+  final candidates = <Uri>[url];
+  final host = url.host.toLowerCase();
+  if (host == 'i.pximg.net') {
+    for (final fallbackHost in _pixivFallbackHosts) {
+      final candidate = url.replace(host: fallbackHost);
+      final alreadyExists = candidates.any(
+        (existing) => existing.toString() == candidate.toString(),
+      );
+      if (!alreadyExists) {
+        candidates.add(candidate);
+      }
+    }
+  }
+  return candidates;
+}
+
+class _ResilientNetworkImage extends StatefulWidget {
+  const _ResilientNetworkImage({
+    required this.urls,
+    this.headers,
+    this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
+    this.errorBuilder,
+  }) : assert(urls.length > 0, 'urls must not be empty');
+
+  final List<Uri> urls;
+  final Map<String, String>? headers;
+  final BoxFit fit;
+  final AlignmentGeometry alignment;
+  final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
+
+  @override
+  State<_ResilientNetworkImage> createState() => _ResilientNetworkImageState();
+}
+
+class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
+  var _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUrl = widget.urls[_index].toString();
+    return Image.network(
+      currentUrl,
+      fit: widget.fit,
+      alignment: widget.alignment,
+      headers: widget.headers,
+      errorBuilder: (context, error, stackTrace) {
+        if (_index < widget.urls.length - 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) {
+              return;
+            }
+            setState(() {
+              _index += 1;
+            });
+          });
+          return const SizedBox.expand();
+        }
+        final builder = widget.errorBuilder;
+        if (builder != null) {
+          return builder(context, error, stackTrace);
+        }
+        return const SizedBox.expand();
+      },
+    );
+  }
 }
 
 class FeedScreen extends ConsumerWidget {
@@ -510,14 +593,16 @@ class _NovelListItem extends StatelessWidget {
           ),
         );
       }
+      final urls = _imageUrlCandidates(previewUrl);
+      final headers = _imageHeadersFor(item, url: previewUrl);
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: AspectRatio(
           aspectRatio: aspectRatio,
-          child: Image.network(
-            previewUrl.toString(),
+          child: _ResilientNetworkImage(
+            urls: urls,
+            headers: headers,
             fit: BoxFit.cover,
-            headers: _imageHeadersFor(item),
             errorBuilder: (_, __, ___) => Container(
               color: theme.colorScheme.surfaceVariant,
               alignment: Alignment.center,
@@ -619,10 +704,10 @@ class _ContentTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: preview != null
-            ? Image.network(
-                preview.toString(),
+            ? _ResilientNetworkImage(
+                urls: _imageUrlCandidates(preview),
+                headers: _imageHeadersFor(item, url: preview),
                 fit: BoxFit.cover,
-                headers: _imageHeadersFor(item),
                 errorBuilder: (_, __, ___) => placeholder(Icons.broken_image),
               )
             : placeholder(Icons.image),
