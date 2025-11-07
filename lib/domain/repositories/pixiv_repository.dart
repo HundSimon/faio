@@ -1,5 +1,6 @@
-import '../models/content_page.dart';
 import '../models/content_item.dart';
+import '../models/content_page.dart';
+import '../models/novel_detail.dart';
 
 abstract interface class PixivRepository {
   Future<ContentPageResult> fetchIllustrations({
@@ -13,5 +14,7 @@ abstract interface class PixivRepository {
 
   Future<FaioContent?> fetchIllustrationDetail(int illustId);
 
-  Future<FaioContent?> fetchNovelDetail(int novelId);
+  Future<NovelDetail?> fetchNovelDetail(int novelId);
+
+  Future<NovelSeriesDetail?> fetchNovelSeries(int seriesId);
 }

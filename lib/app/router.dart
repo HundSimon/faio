@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/models/content_item.dart';
 import '../features/feed/presentation/feed_screen.dart';
 import '../features/feed/presentation/illustration_detail_screen.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/novel/presentation/novel_detail_screen.dart';
+import '../features/novel/presentation/novel_reader_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/shell/presentation/home_shell.dart';
@@ -13,6 +16,8 @@ import '../features/shell/presentation/home_shell.dart';
 abstract final class AppRoute {
   static const feed = '/feed';
   static const feedDetail = 'feed_detail';
+  static const feedNovelDetail = 'feed_novel_detail';
+  static const feedNovelReader = 'feed_novel_reader';
   static const search = '/search';
   static const library = '/library';
   static const settings = '/settings';
@@ -28,7 +33,7 @@ final appRouterProvider = Provider<GoRouter>(
     routes: [
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
-            HomeShell(navigationShell: navigationShell),
+            HomeShell(navigationShell: navigationShell, currentState: state),
         branches: [
           StatefulShellBranch(
             routes: [
@@ -57,6 +62,44 @@ final appRouterProvider = Provider<GoRouter>(
                       }
                       return IllustrationDetailScreen(initialIndex: index);
                     },
+                  ),
+                  GoRoute(
+                    path: 'novel/:novelId',
+                    name: AppRoute.feedNovelDetail,
+                    builder: (context, state) {
+                      final novelIdParam = state.pathParameters['novelId'];
+                      final novelId = novelIdParam != null
+                          ? int.tryParse(novelIdParam)
+                          : null;
+                      FaioContent? initialContent;
+                      final extra = state.extra;
+                      if (extra is FaioContent) {
+                        initialContent = extra;
+                      }
+                      if (novelId == null) {
+                        return const _RouteErrorScreen();
+                      }
+                      return NovelDetailScreen(
+                        novelId: novelId,
+                        initialContent: initialContent,
+                      );
+                    },
+                    routes: [
+                      GoRoute(
+                        path: 'reader',
+                        name: AppRoute.feedNovelReader,
+                        builder: (context, state) {
+                          final novelIdParam = state.pathParameters['novelId'];
+                          final novelId = novelIdParam != null
+                              ? int.tryParse(novelIdParam)
+                              : null;
+                          if (novelId == null) {
+                            return const _RouteErrorScreen();
+                          }
+                          return NovelReaderScreen(novelId: novelId);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

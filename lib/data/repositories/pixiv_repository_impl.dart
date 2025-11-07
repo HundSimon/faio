@@ -1,10 +1,12 @@
 import '../../domain/models/content_item.dart';
 import '../../domain/models/content_page.dart';
+import '../../domain/models/novel_detail.dart';
 import '../../domain/repositories/pixiv_repository.dart';
 import '../furrynovel/furrynovel_service.dart';
 import '../pixiv/models/pixiv_models.dart';
 import '../pixiv/pixiv_service.dart';
 import 'mappers/content_mapper.dart';
+import 'mappers/novel_mapper.dart';
 
 class PixivRepositoryImpl implements PixivRepository {
   PixivRepositoryImpl({
@@ -96,17 +98,23 @@ class PixivRepositoryImpl implements PixivRepository {
   }
 
   @override
-  Future<FaioContent?> fetchNovelDetail(int novelId) async {
+  Future<NovelDetail?> fetchNovelDetail(int novelId) async {
     final furryNovel = await _furryNovelService.fetchNovel(novelId);
     if (furryNovel != null) {
-      return ContentMapper.fromFurryNovel(furryNovel);
+      return NovelMapper.fromFurryNovel(furryNovel);
     }
 
     final pixivNovel = await _service.fetchNovelDetail(novelId);
     if (pixivNovel == null) {
       return null;
     }
-    return ContentMapper.fromPixivNovel(pixivNovel);
+    return NovelMapper.fromPixivNovel(pixivNovel);
+  }
+
+  @override
+  Future<NovelSeriesDetail?> fetchNovelSeries(int seriesId) async {
+    final series = await _furryNovelService.fetchSeries(seriesId);
+    return NovelMapper.fromFurrySeries(series);
   }
 
   int _offsetForPage(int page, int limit) {

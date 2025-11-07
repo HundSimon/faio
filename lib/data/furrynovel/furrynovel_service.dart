@@ -47,4 +47,18 @@ class FurryNovelService {
     );
     return FurryNovelPage.parseNovel(response.data);
   }
+
+  Future<FurryNovelSeriesDetail?> fetchSeries(int id) async {
+    if (id <= 0) {
+      return null;
+    }
+    final response = await _dio.get<dynamic>(
+      '/pixiv/series/$id/cache',
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return FurryNovelSeriesDetail.fromJson(data);
+    }
+    return null;
+  }
 }

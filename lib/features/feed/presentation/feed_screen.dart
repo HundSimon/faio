@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:faio/domain/models/content_item.dart';
 
+import 'package:faio/domain/utils/content_id.dart';
+
 import '../providers/feed_providers.dart';
 
 const _pixivFallbackHosts = ['i.pixiv.cat', 'i.pixiv.re', 'i.pixiv.nl'];
@@ -724,8 +726,15 @@ class _NovelListItem extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          final messenger = ScaffoldMessenger.maybeOf(context);
-          messenger?.showSnackBar(const SnackBar(content: Text('小说详情页开发中')));
+          final novelId = parseContentNumericId(item);
+          if (novelId == null) {
+            final messenger = ScaffoldMessenger.maybeOf(context);
+            messenger?.showSnackBar(
+              const SnackBar(content: Text('无法解析小说 ID')),
+            );
+            return;
+          }
+          context.push('/feed/novel/$novelId', extra: item);
         },
         splashColor: theme.colorScheme.primary.withOpacity(0.08),
         child: Padding(

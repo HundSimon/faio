@@ -201,3 +201,100 @@ class FurryNovelImage {
     return FurryNovelImage(origin: parseUri(json['origin']));
   }
 }
+
+class FurryNovelSeriesDetail {
+  const FurryNovelSeriesDetail({
+    required this.id,
+    required this.title,
+    required this.caption,
+    this.tags = const [],
+    this.novels = const [],
+  });
+
+  final int id;
+  final String title;
+  final String caption;
+  final List<String> tags;
+  final List<FurryNovelSeriesEntry> novels;
+
+  factory FurryNovelSeriesDetail.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const FurryNovelSeriesDetail(
+        id: 0,
+        title: '',
+        caption: '',
+      );
+    }
+
+    List<String> parseTags(dynamic value) {
+      if (value is List) {
+        return value
+            .whereType<String>()
+            .map((tag) => tag.trim())
+            .where((tag) => tag.isNotEmpty)
+            .toList();
+      }
+      if (value is String && value.isNotEmpty) {
+        return value
+            .split(',')
+            .map((tag) => tag.trim())
+            .where((tag) => tag.isNotEmpty)
+            .toList();
+      }
+      return const [];
+    }
+
+    final novelsRaw = json['novels'];
+    final novels = <FurryNovelSeriesEntry>[];
+    if (novelsRaw is List) {
+      for (final element in novelsRaw) {
+        if (element is Map<String, dynamic>) {
+          novels.add(FurryNovelSeriesEntry.fromJson(element));
+        }
+      }
+    }
+
+    return FurryNovelSeriesDetail(
+      id: _parseFlexibleInt(json['id']) ?? 0,
+      title: (json['title'] as String? ?? '').trim(),
+      caption: (json['caption'] as String? ?? '').trim(),
+      tags: parseTags(json['tags']),
+      novels: novels,
+    );
+  }
+}
+
+class FurryNovelSeriesEntry {
+  const FurryNovelSeriesEntry({
+    required this.id,
+    required this.title,
+    this.coverUrl,
+  });
+
+  final int id;
+  final String title;
+  final Uri? coverUrl;
+
+  factory FurryNovelSeriesEntry.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const FurryNovelSeriesEntry(id: 0, title: '');
+    }
+
+    Uri? parseUri(dynamic value) {
+      if (value is String && value.trim().isNotEmpty) {
+        final trimmed = value.trim();
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          return Uri.tryParse(trimmed);
+        }
+        return Uri.tryParse('https://$trimmed');
+      }
+      return null;
+    }
+
+    return FurryNovelSeriesEntry(
+      id: _parseFlexibleInt(json['id']) ?? 0,
+      title: (json['title'] as String? ?? '').trim(),
+      coverUrl: parseUri(json['coverUrl'] ?? json['cover_url']),
+    );
+  }
+}
