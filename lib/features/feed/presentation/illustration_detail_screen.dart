@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:faio/domain/models/content_item.dart';
+import 'package:faio/features/common/widgets/detail_section_card.dart';
+import 'package:faio/features/library/providers/library_providers.dart';
 
 import '../providers/feed_providers.dart';
 import 'illustration_gallery_screen.dart';
@@ -31,6 +34,7 @@ class _IllustrationDetailScreenState
     extends ConsumerState<IllustrationDetailScreen> {
   late int _currentIndex;
   bool _ensurePending = false;
+  String? _lastRecordedId;
 
   @override
   void initState() {
@@ -59,6 +63,36 @@ class _IllustrationDetailScreenState
     });
   }
 
+  void _recordView(FaioContent content) {
+    if (_lastRecordedId == content.id) {
+      return;
+    }
+    _lastRecordedId = content.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(libraryHistoryProvider.notifier).recordView(content);
+    });
+  }
+
+  Uri? _primarySourceLink(FaioContent content) {
+    if (content.originalUrl != null) {
+      return content.originalUrl;
+    }
+    if (content.sourceLinks.isNotEmpty) {
+      return content.sourceLinks.first;
+    }
+    return null;
+  }
+
+  Future<void> _openSourceLink(BuildContext context, Uri url) async {
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法打开链接：${url.host}')),
+      );
+    }
+  }
+
   Future<void> _openGallery() async {
     final result = await Navigator.of(context, rootNavigator: true).push<int>(
       PageRouteBuilder(
@@ -75,6 +109,7 @@ class _IllustrationDetailScreenState
     if (result != null && result != _currentIndex) {
       setState(() {
         _currentIndex = result;
+        _lastRecordedId = null;
       });
       ref.read(feedSelectionProvider.notifier).select(result);
       ref.read(feedControllerProvider.notifier).ensureIndexLoaded(result);
@@ -96,6 +131,7 @@ class _IllustrationDetailScreenState
       if (selected != null && selected != _currentIndex) {
         setState(() {
           _currentIndex = selected;
+          _lastRecordedId = null;
         });
       }
     });
@@ -129,10 +165,23 @@ class _IllustrationDetailScreenState
     }
 
     final content = maybeContent;
+    _recordView(content);
+    final isFavorite = ref.watch(
+      libraryFavoritesProvider.select((asyncValue) {
+        final entries = asyncValue.valueOrNull;
+        if (entries == null) {
+          return false;
+        }
+        return entries.any(
+          (entry) => entry.isContent && entry.content!.id == content.id,
+        );
+      }),
+    );
     final aspectRatio = content.previewAspectRatio ?? 1;
     final hasSummary = content.summary.trim().isNotEmpty;
     final detailImageUrl = content.sampleUrl ?? content.previewUrl;
     final fallbackPreviewUrl = content.previewUrl;
+    final primaryLink = _primarySourceLink(content);
 
     String formatDateTime(DateTime? dateTime) {
       if (dateTime == null) {
@@ -144,16 +193,200 @@ class _IllustrationDetailScreenState
     }
 
     final formattedCreatedAt = formatDateTime(content.publishedAt);
+    final formattedUpdatedAt = formatDateTime(content.updatedAt);
 
     Widget placeholder(IconData icon) {
       return Container(
-        height: 240,
+        height: 280,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(24),
         ),
-        child: Icon(icon, color: theme.colorScheme.onSurfaceVariant),
+        child: Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 48),
+      );
+    }
+
+    Widget buildHero() {
+      if (detailImageUrl == null) {
+        return placeholder(Icons.image);
+      }
+      return GestureDetector(
+        onTap: _openGallery,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: aspectRatio > 0 ? aspectRatio : 1,
+                child: Image.network(
+                  detailImageUrl.toString(),
+                  fit: BoxFit.cover,
+                  headers: _imageHeadersFor(content),
+                  errorBuilder: (_, __, ___) => placeholder(Icons.broken_image),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) {
+                      return child;
+                    }
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (fallbackPreviewUrl != null)
+                          Image.network(
+                            fallbackPreviewUrl.toString(),
+                            fit: BoxFit.cover,
+                            headers: _imageHeadersFor(content),
+                            errorBuilder: (_, __, ___) =>
+                                placeholder(Icons.broken_image),
+                          ),
+                        const Center(child: CircularProgressIndicator()),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.35),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget buildMetaCard() {
+      final chips = <Widget>[
+        if (content.rating.isNotEmpty)
+          _MetaChip(
+            icon: Icons.shield,
+            label: '评级 ${content.rating}',
+          ),
+        _MetaChip(
+          icon: Icons.schedule,
+          label: '发布 $formattedCreatedAt',
+        ),
+        _MetaChip(
+          icon: Icons.update,
+          label: '更新 $formattedUpdatedAt',
+        ),
+        _MetaChip(
+          icon: Icons.people_alt_outlined,
+          label: content.authorName?.isNotEmpty == true
+              ? content.authorName!
+              : '匿名作者',
+        ),
+      ];
+      return DetailSectionCard(
+        title: '作品信息',
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: chips,
+        ),
+      );
+    }
+
+    Widget buildPrimaryActions() {
+      final baseCount = content.favoriteCount;
+      final displayCount = baseCount + (isFavorite ? 1 : 0);
+      final favoriteLabelBase = isFavorite ? '已收藏' : '收藏';
+      final favoriteLabel = '$favoriteLabelBase（$displayCount）';
+      return Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              icon: Icon(
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+              ),
+              label: Text(favoriteLabel),
+              onPressed: () {
+                ref
+                    .read(libraryFavoritesProvider.notifier)
+                    .toggleContentFavorite(content);
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_new),
+              label: Text(primaryLink == null ? '暂无外链' : '打开原站'),
+              onPressed: primaryLink == null
+                  ? null
+                  : () => _openSourceLink(context, primaryLink),
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildSummaryCard() {
+      return DetailSectionCard(
+        title: '简介',
+        child: SelectableText(
+          hasSummary ? content.summary : '暂无简介',
+          style: theme.textTheme.bodyMedium,
+        ),
+      );
+    }
+
+    Widget buildTagsCard() {
+      return DetailSectionCard(
+        title: '标签',
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: content.tags
+              .map(
+                (tag) => Chip(
+                  label: Text(tag),
+                  backgroundColor: theme.colorScheme.surfaceVariant,
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+
+    Widget buildSourceCard() {
+      return DetailSectionCard(
+        title: '来源链接',
+        child: Column(
+          children: [
+            for (var i = 0; i < content.sourceLinks.length; i++) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  content.sourceLinks[i].host,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  content.sourceLinks[i].toString(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => _openSourceLink(context, content.sourceLinks[i]),
+              ),
+              if (i < content.sourceLinks.length - 1)
+                const Divider(height: 12),
+            ],
+          ],
+        ),
       );
     }
 
@@ -167,144 +400,57 @@ class _IllustrationDetailScreenState
           leading: BackButton(
             onPressed: () => Navigator.of(context).maybePop(),
           ),
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (detailImageUrl != null)
-                GestureDetector(
-                  onTap: _openGallery,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: aspectRatio > 0 ? aspectRatio : 1,
-                      child: Image.network(
-                        detailImageUrl.toString(),
-                        fit: BoxFit.cover,
-                        headers: _imageHeadersFor(content),
-                        errorBuilder: (_, __, ___) =>
-                            placeholder(Icons.broken_image),
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) {
-                            return child;
-                          }
-                          return Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              if (fallbackPreviewUrl != null)
-                                Image.network(
-                                  fallbackPreviewUrl.toString(),
-                                  fit: BoxFit.cover,
-                                  headers: _imageHeadersFor(content),
-                                  errorBuilder: (_, __, ___) =>
-                                      placeholder(Icons.broken_image),
-                                ),
-                              const Center(child: CircularProgressIndicator()),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                )
-              else
-                placeholder(Icons.image),
-              const SizedBox(height: 16),
-              Text('来源：${content.source}', style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              Text(
-                '作者：${content.authorName ?? '未知'}',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Text('评级：${content.rating}', style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              Text(
-                '创建时间：$formattedCreatedAt',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '更新时间：${formatDateTime(content.updatedAt)}',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '收藏数：${content.favoriteCount}',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '简介',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                hasSummary ? content.summary : '暂无简介',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: hasSummary
-                      ? theme.colorScheme.onSurface
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (content.sourceLinks.isNotEmpty) ...[
-                Text(
-                  '来源链接',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: content.sourceLinks
-                      .map(
-                        (uri) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: SelectableText(
-                            uri.toString(),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.primary,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (content.tags.isNotEmpty) ...[
-                Text(
-                  '标签',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: content.tags
-                      .map(
-                        (tag) => Chip(
-                          label: Text(tag),
-                          backgroundColor: theme.colorScheme.surfaceVariant,
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ],
+          title: Text(
+            content.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          children: [
+            buildHero(),
+            const SizedBox(height: 20),
+            Text(
+              content.title,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 20),
+            buildPrimaryActions(),
+            const SizedBox(height: 20),
+            buildMetaCard(),
+            const SizedBox(height: 20),
+            buildSummaryCard(),
+            if (content.tags.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              buildTagsCard(),
+            ],
+            if (content.sourceLinks.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              buildSourceCard(),
+            ],
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label),
+      backgroundColor: theme.colorScheme.surfaceVariant,
     );
   }
 }

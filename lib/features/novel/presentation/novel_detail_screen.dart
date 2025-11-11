@@ -6,12 +6,17 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
+import 'package:faio/features/common/widgets/detail_section_card.dart';
+import 'package:faio/features/library/domain/library_entries.dart';
+import 'package:faio/features/library/providers/library_providers.dart';
+import 'package:faio/features/library/utils/library_mappers.dart';
+import 'package:faio/features/library/presentation/widgets/favorite_icon_button.dart';
 
 import '../providers/novel_providers.dart';
 import 'widgets/novel_image.dart';
 import 'widgets/novel_series_sheet.dart';
 
-class NovelDetailScreen extends ConsumerWidget {
+class NovelDetailScreen extends ConsumerStatefulWidget {
   const NovelDetailScreen({
     required this.novelId,
     this.initialContent,
@@ -22,13 +27,39 @@ class NovelDetailScreen extends ConsumerWidget {
   final FaioContent? initialContent;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(novelDetailProvider(novelId));
-    final progressAsync = ref.watch(novelReadingProgressProvider(novelId));
+  ConsumerState<NovelDetailScreen> createState() => _NovelDetailScreenState();
+}
+
+class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
+  String? _lastRecordedContentId;
+
+  void _recordHistory(FaioContent content, {bool force = false}) {
+    if (!force && _lastRecordedContentId == content.id) {
+      return;
+    }
+    _lastRecordedContentId = content.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(libraryHistoryProvider.notifier).recordView(content);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final detailAsync = ref.watch(novelDetailProvider(widget.novelId));
+    final progressAsync =
+        ref.watch(novelReadingProgressProvider(widget.novelId));
     final title = detailAsync.maybeWhen(
       data: (detail) => detail.title,
-      orElse: () => initialContent?.title ?? '小说详情',
+      orElse: () => widget.initialContent?.title ?? '小说详情',
     );
+    final detail = detailAsync.valueOrNull;
+    final historyContent = detail != null
+        ? novelDetailToContent(detail, fallback: widget.initialContent)
+        : widget.initialContent;
+    if (historyContent != null) {
+      _recordHistory(historyContent, force: detail != null);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -41,14 +72,16 @@ class NovelDetailScreen extends ConsumerWidget {
       body: detailAsync.when(
         data: (detail) => _NovelDetailContent(
           detail: detail,
-          initialContent: initialContent,
-          novelId: novelId,
+          initialContent: widget.initialContent,
+          novelId: widget.novelId,
           progressAsync: progressAsync,
+          favoriteContent: historyContent,
         ),
-        loading: () => _NovelDetailSkeleton(initialContent: initialContent),
+        loading: () =>
+            _NovelDetailSkeleton(initialContent: widget.initialContent),
         error: (error, stackTrace) => _NovelDetailError(
           message: error.toString(),
-          onRetry: () => ref.invalidate(novelDetailProvider(novelId)),
+          onRetry: () => ref.invalidate(novelDetailProvider(widget.novelId)),
         ),
       ),
     );
@@ -131,12 +164,14 @@ class _NovelDetailContent extends ConsumerWidget {
     required this.initialContent,
     required this.novelId,
     required this.progressAsync,
+    this.favoriteContent,
   });
 
   final NovelDetail detail;
   final FaioContent? initialContent;
   final int novelId;
   final AsyncValue<NovelReadingProgress?> progressAsync;
+  final FaioContent? favoriteContent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -154,102 +189,243 @@ class _NovelDetailContent extends ConsumerWidget {
         ? detail.tags
         : (initialContent?.tags ?? const []);
     final publishedAt = detail.createdAt ?? initialContent?.publishedAt;
+    final favoriteEntry =
+        favoriteContent ?? novelDetailToContent(detail, fallback: initialContent);
+    final isFavorite = ref.watch(
+      libraryFavoritesProvider.select((asyncValue) {
+        final entries = asyncValue.valueOrNull;
+        if (entries == null) {
+          return false;
+        }
+        return entries.any(
+          (entry) => entry.isContent && entry.content!.id == favoriteEntry.id,
+        );
+      }),
+    );
+    final primaryLink = favoriteEntry.originalUrl ??
+        (favoriteEntry.sourceLinks.isNotEmpty
+            ? favoriteEntry.sourceLinks.first
+            : null);
+
+    Widget buildHero() {
+      if (coverUrl == null) {
+        return Container(
+          height: 260,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.menu_book_outlined,
+            size: 48,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        );
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            AspectRatio(
+              aspectRatio: 0.75,
+              child: ResilientNetworkImage(
+                urls: imageUrlCandidates(coverUrl),
+                headers: imageHeadersForUrl(coverUrl),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: theme.colorScheme.surfaceVariant,
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.35),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget buildPrimaryActions() {
+      final baseCount = favoriteEntry.favoriteCount;
+      final displayCount = baseCount + (isFavorite ? 1 : 0);
+      final favoriteLabel =
+          '${isFavorite ? '已收藏' : '收藏'}（$displayCount）';
+      return Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
+              label: Text(favoriteLabel),
+              onPressed: () {
+                ref
+                    .read(libraryFavoritesProvider.notifier)
+                    .toggleContentFavorite(favoriteEntry);
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_new),
+              label: Text(primaryLink == null ? '暂无外链' : '打开原站'),
+              onPressed: primaryLink == null
+                  ? null
+                  : () => _launchExternal(context, primaryLink),
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildTagsCard() {
+      return DetailSectionCard(
+        title: '标签',
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: tags
+              .map(
+                (tag) => Chip(
+                  label: Text(tag),
+                  backgroundColor: theme.colorScheme.surfaceVariant,
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+
+    Widget buildSourceCard() {
+      return DetailSectionCard(
+        title: '外部链接',
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: detail.sourceLinks
+              .map(
+                (link) => OutlinedButton.icon(
+                  icon: const Icon(Icons.open_in_new),
+                  onPressed: () => _launchExternal(context, link),
+                  label: Text(link.host),
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
 
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(novelDetailProvider(novelId));
         ref.invalidate(novelReadingProgressProvider(novelId));
       },
-      child: SingleChildScrollView(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _CoverSection(
-              coverUrl: coverUrl,
-              detail: detail,
-              authorName: authorName,
-              summary: summary,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: [
+          buildHero(),
+          if (detail.length != null) ...[
+            const SizedBox(height: 12),
+            _InfoPill(
+              icon: Icons.menu_book,
+              label: '${detail.length} 字',
+              background: theme.colorScheme.surfaceVariant,
             ),
-            const SizedBox(height: 16),
-            _ReadActionCard(
-              detail: detail,
-              novelId: novelId,
-              progressAsync: progressAsync,
-              onReadPressed: () {
-                context.push('/feed/novel/$novelId/reader');
-              },
-              onClearProgress: progress == null
-                  ? null
-                  : () async {
-                      final storage = ref.read(novelReadingStorageProvider);
-                      await storage.clearProgress(novelId);
-                      ref.invalidate(
-                        novelReadingProgressProvider(novelId),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            detail.title,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '评级：${favoriteEntry.rating.isNotEmpty ? favoriteEntry.rating : 'General'}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            authorName,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 20),
+          buildPrimaryActions(),
+          const SizedBox(height: 16),
+          _ReadActionCard(
+            detail: detail,
+            novelId: novelId,
+            progressAsync: progressAsync,
+            onReadPressed: () {
+              context.push('/feed/novel/$novelId/reader');
+            },
+            onClearProgress: progress == null
+                ? null
+                : () async {
+                    final storage = ref.read(novelReadingStorageProvider);
+                    await storage.clearProgress(novelId);
+                    ref.invalidate(
+                      novelReadingProgressProvider(novelId),
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已清除阅读进度')),
                       );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已清除阅读进度')),
-                        );
-                      }
-                    },
-            ),
-            const SizedBox(height: 16),
-            _MetaInfoSection(
+                    }
+                  },
+          ),
+          const SizedBox(height: 16),
+          DetailSectionCard(
+            title: '作品信息',
+            child: _MetaInfoSection(
               authorName: authorName,
               publishedAt: publishedAt,
               length: detail.length ?? detail.body.length,
-              rating: initialContent?.rating,
+              rating: favoriteEntry.rating,
+              readCount: detail.readCount,
             ),
-            if (tags.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _TagsSection(tags: tags),
-            ],
-            const SizedBox(height: 24),
-            Text(
-              '简介',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
+          ),
+          const SizedBox(height: 16),
+          DetailSectionCard(
+            title: '简介',
+            child: SelectableText(
               summary.isNotEmpty ? summary : '暂无简介',
               style: theme.textTheme.bodyLarge,
             ),
-            if (detail.series?.isValid ?? false) ...[
-              const SizedBox(height: 24),
-              _NovelSeriesPreview(
-                series: detail.series!,
-                currentNovelId: novelId,
-              ),
-            ],
-            if (detail.sourceLinks.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              Text(
-                '外部链接',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: detail.sourceLinks
-                    .map(
-                      (link) => OutlinedButton.icon(
-                        icon: const Icon(Icons.open_in_new),
-                        onPressed: () => _launchExternal(context, link),
-                        label: Text(link.host),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
+          ),
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            buildTagsCard(),
           ],
-        ),
+          if (detail.series?.isValid ?? false) ...[
+            const SizedBox(height: 16),
+            _NovelSeriesPreview(
+              series: detail.series!,
+              currentNovelId: novelId,
+            ),
+          ],
+          if (detail.sourceLinks.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            buildSourceCard(),
+          ],
+        ],
       ),
     );
   }
@@ -261,88 +437,6 @@ class _NovelDetailContent extends ConsumerWidget {
         SnackBar(content: Text('无法打开链接：${url.toString()}')),
       );
     }
-  }
-}
-
-class _CoverSection extends StatelessWidget {
-  const _CoverSection({
-    required this.coverUrl,
-    required this.detail,
-    required this.authorName,
-    required this.summary,
-  });
-
-  final Uri? coverUrl;
-  final NovelDetail detail;
-  final String authorName;
-  final String summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final placeholder = Container(
-      height: 220,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: theme.colorScheme.surfaceVariant,
-      ),
-      alignment: Alignment.center,
-      child: Icon(
-        Icons.menu_book_outlined,
-        color: theme.colorScheme.onSurfaceVariant,
-        size: 48,
-      ),
-    );
-
-    Widget buildImage() {
-      final cover = coverUrl;
-      if (cover == null) {
-        return placeholder;
-      }
-      final urls = imageUrlCandidates(cover);
-      final headers = imageHeadersForUrl(cover);
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: SizedBox(
-          height: 220,
-          width: double.infinity,
-          child: ResilientNetworkImage(
-            urls: urls,
-            headers: headers,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => placeholder,
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        buildImage(),
-        const SizedBox(height: 16),
-        Text(
-          detail.title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          authorName,
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          summary,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium,
-        ),
-      ],
-    );
   }
 }
 
@@ -431,12 +525,14 @@ class _MetaInfoSection extends StatelessWidget {
     required this.publishedAt,
     required this.length,
     this.rating,
+    this.readCount,
   });
 
   final String authorName;
   final DateTime? publishedAt;
   final int length;
   final String? rating;
+  final int? readCount;
 
   @override
   Widget build(BuildContext context) {
@@ -461,47 +557,17 @@ class _MetaInfoSection extends StatelessWidget {
           avatar: const Icon(Icons.shield, size: 18),
           label: Text(rating!),
         ),
+      if (readCount != null && readCount! > 0)
+        Chip(
+          avatar: const Icon(Icons.visibility, size: 18),
+          label: Text('$readCount 阅读'),
+        ),
     ];
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: chips,
-    );
-  }
-}
-
-class _TagsSection extends StatelessWidget {
-  const _TagsSection({required this.tags});
-
-  final List<String> tags;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '标签',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: tags
-              .map(
-                (tag) => Chip(
-                  label: Text(tag),
-                  backgroundColor: theme.colorScheme.surfaceVariant,
-                ),
-              )
-              .toList(),
-        ),
-      ],
     );
   }
 }
@@ -519,6 +585,10 @@ class _NovelSeriesPreview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final seriesAsync = ref.watch(novelSeriesDetailProvider(series.id));
+    final seriesFavorite = LibrarySeriesFavorite(
+      seriesId: series.id,
+      title: series.title.isNotEmpty ? series.title : '未知合集',
+    );
 
     Future<void> openSelector() async {
       final selected = await showNovelSeriesSheet(
@@ -549,6 +619,13 @@ class _NovelSeriesPreview extends ConsumerWidget {
                     ),
                   ),
                 ),
+                FavoriteIconButton.series(
+                  series: seriesFavorite,
+                  backgroundColor: Colors.transparent,
+                  iconSize: 22,
+                  padding: EdgeInsets.zero,
+                ),
+                const SizedBox(width: 4),
                 TextButton(
                   onPressed: openSelector,
                   child: const Text('查看选集'),
@@ -617,4 +694,46 @@ String _formatDate(DateTime dateTime) {
   final two = (int value) => value.toString().padLeft(2, '0');
   return '${local.year}-${two(local.month)}-${two(local.day)} '
       '${two(local.hour)}:${two(local.minute)}';
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({
+    required this.icon,
+    required this.label,
+    this.background,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background ??
+            theme.colorScheme.surfaceVariant.withOpacity(
+              theme.brightness == Brightness.dark ? 0.7 : 0.9,
+            ),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: theme.colorScheme.onSurface),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

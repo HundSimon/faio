@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:faio/domain/models/content_item.dart';
-
 import 'package:faio/domain/utils/content_id.dart';
 
 import '../providers/feed_providers.dart';
@@ -943,7 +942,6 @@ class _ContentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final preview = item.previewUrl ?? item.sampleUrl;
-
     Widget placeholder(IconData icon) {
       return Container(
         color: theme.colorScheme.surfaceVariant,

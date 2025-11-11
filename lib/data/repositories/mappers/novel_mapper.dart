@@ -47,6 +47,8 @@ class NovelMapper {
       updatedAt: novel.createDate,
       images: images,
       sourceLinks: links,
+      likeCount: novel.pixivLikeCount,
+      readCount: novel.pixivReadCount,
     );
   }
 
@@ -77,6 +79,7 @@ class NovelMapper {
       sourceLinks: [
         Uri.parse('https://www.pixiv.net/novel/show.php?id=${novel.id}'),
       ],
+      likeCount: novel.totalBookmarks,
     );
   }
 

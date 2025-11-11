@@ -17,6 +17,8 @@ class NovelDetail extends Equatable {
     this.updatedAt,
     this.images = const {},
     this.sourceLinks = const [],
+    this.likeCount,
+    this.readCount,
   });
 
   final int novelId;
@@ -34,6 +36,8 @@ class NovelDetail extends Equatable {
   final DateTime? updatedAt;
   final Map<String, Uri> images;
   final List<Uri> sourceLinks;
+  final int? likeCount;
+  final int? readCount;
 
   bool get hasBody => body.trim().isNotEmpty;
 
@@ -57,6 +61,8 @@ class NovelDetail extends Equatable {
         updatedAt,
         images,
         sourceLinks,
+        likeCount,
+        readCount,
       ];
 
   NovelDetail copyWith({
@@ -74,6 +80,8 @@ class NovelDetail extends Equatable {
     DateTime? updatedAt,
     Map<String, Uri>? images,
     List<Uri>? sourceLinks,
+    int? likeCount,
+    int? readCount,
   }) {
     return NovelDetail(
       novelId: novelId,
@@ -91,6 +99,8 @@ class NovelDetail extends Equatable {
       updatedAt: updatedAt ?? this.updatedAt,
       images: images ?? this.images,
       sourceLinks: sourceLinks ?? this.sourceLinks,
+      likeCount: likeCount ?? this.likeCount,
+      readCount: readCount ?? this.readCount,
     );
   }
 }

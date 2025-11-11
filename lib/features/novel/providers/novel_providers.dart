@@ -1,19 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../domain/models/novel_detail.dart';
 import '../../../domain/models/novel_reader.dart';
+import '../../../core/providers/shared_preferences_provider.dart';
 import '../data/novel_reading_storage.dart';
 
-final sharedPreferencesFutureProvider =
-    Provider<Future<SharedPreferences>>((ref) {
-  final future = SharedPreferences.getInstance();
-  return future;
-}, name: 'sharedPreferencesFutureProvider');
-
 final novelReadingStorageProvider = Provider<NovelReadingStorage>((ref) {
-  final prefsFuture = ref.watch(sharedPreferencesFutureProvider);
+  final prefsFuture = ref.watch(sharedPreferencesProvider);
   return NovelReadingStorage(prefsFuture: prefsFuture);
 }, name: 'novelReadingStorageProvider');
 
