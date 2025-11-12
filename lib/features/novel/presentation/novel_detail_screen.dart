@@ -63,6 +63,12 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
     if (historyContent != null) {
       _recordHistory(historyContent, force: detail != null);
     }
+    final fallbackDetail = widget.initialContent != null
+        ? contentToNovelDetail(
+            widget.initialContent!,
+            novelIdOverride: widget.novelId,
+          )
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -80,8 +86,18 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
           progressAsync: progressAsync,
           favoriteContent: historyContent,
         ),
-        loading: () =>
-            _NovelDetailSkeleton(initialContent: widget.initialContent),
+        loading: () {
+          if (fallbackDetail != null) {
+            return _NovelDetailContent(
+              detail: fallbackDetail,
+              initialContent: widget.initialContent,
+              novelId: widget.novelId,
+              progressAsync: progressAsync,
+              favoriteContent: widget.initialContent,
+            );
+          }
+          return _NovelDetailSkeleton(initialContent: widget.initialContent);
+        },
         error: (error, stackTrace) => _NovelDetailError(
           message: error.toString(),
           onRetry: () => ref.invalidate(novelDetailProvider(widget.novelId)),
