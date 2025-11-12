@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-final _readerRouteRegExp = RegExp(r'^/feed/novel/\d+/reader$');
+// Routes where an immersive experience is desirable (hide the bottom nav).
+final List<RegExp> _navHiddenRoutePatterns = [
+  RegExp(r'^/feed/detail$'),
+  RegExp(r'^/feed/novel/\d+$'),
+  RegExp(r'^/feed/novel/\d+/reader$'),
+];
 
-bool _isReaderRoute(String location) {
+bool _isNavHiddenRoute(String location) {
   if (location.isEmpty) {
     return false;
   }
   final normalized = location.contains('?')
       ? location.substring(0, location.indexOf('?'))
       : location;
-  return _readerRouteRegExp.hasMatch(normalized);
+  return _navHiddenRoutePatterns.any((pattern) => pattern.hasMatch(normalized));
 }
 
 /// Shell widget that renders the bottom navigation scaffold.
@@ -37,7 +42,7 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hideNavBar = _isReaderRoute(currentState.uri.toString());
+    final hideNavBar = _isNavHiddenRoute(currentState.uri.toString());
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: hideNavBar
