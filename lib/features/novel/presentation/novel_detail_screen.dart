@@ -143,7 +143,8 @@ class _NovelDetailSkeleton extends StatelessWidget {
           children: [
             _NovelHeroImage(
               contentId: initialContent?.id,
-              coverUrl: initialCoverUrl,
+              lowRes: initialCoverUrl,
+              highRes: initialCoverUrl,
               fallbackColor: theme.colorScheme.surfaceVariant,
             ),
             const SizedBox(height: 24),
@@ -255,9 +256,12 @@ class _NovelDetailContent extends ConsumerWidget {
             : null);
 
     Widget buildHero() {
+      final lowResCover =
+          initialContent?.previewUrl ?? initialContent?.sampleUrl;
       return _NovelHeroImage(
         contentId: favoriteEntry.id,
-        coverUrl: coverUrl,
+        lowRes: lowResCover,
+        highRes: coverUrl ?? lowResCover,
         fallbackColor: theme.colorScheme.surfaceVariant,
       );
     }
@@ -746,19 +750,21 @@ class _InfoPill extends StatelessWidget {
 class _NovelHeroImage extends StatelessWidget {
   const _NovelHeroImage({
     required this.contentId,
-    this.coverUrl,
+    this.lowRes,
+    this.highRes,
     this.fallbackColor,
   });
 
   final String? contentId;
-  final Uri? coverUrl;
+  final Uri? lowRes;
+  final Uri? highRes;
   final Color? fallbackColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     Widget child;
-    if (coverUrl == null) {
+    if (lowRes == null && highRes == null) {
       child = Container(
         height: 260,
         decoration: BoxDecoration(
@@ -775,34 +781,13 @@ class _NovelHeroImage extends StatelessWidget {
     } else {
       child = ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            AspectRatio(
-              aspectRatio: 0.75,
-              child: ResilientNetworkImage(
-                urls: imageUrlCandidates(coverUrl!),
-                headers: imageHeadersForUrl(coverUrl),
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: theme.colorScheme.surfaceVariant,
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.35),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+        child: AspectRatio(
+          aspectRatio: 0.75,
+          child: _ProgressiveNovelImage(
+            lowRes: lowRes,
+            highRes: highRes,
+            fallbackColor: fallbackColor ?? theme.colorScheme.surfaceVariant,
+          ),
         ),
       );
     }
@@ -815,6 +800,99 @@ class _NovelHeroImage extends StatelessWidget {
       tag: novelHeroTag(contentId!),
       transitionOnUserGestures: true,
       child: child,
+    );
+  }
+}
+
+class _ProgressiveNovelImage extends StatefulWidget {
+  const _ProgressiveNovelImage({
+    this.lowRes,
+    this.highRes,
+    required this.fallbackColor,
+  });
+
+  final Uri? lowRes;
+  final Uri? highRes;
+  final Color fallbackColor;
+
+  @override
+  State<_ProgressiveNovelImage> createState() => _ProgressiveNovelImageState();
+}
+
+class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
+  bool _highResLoaded = false;
+
+  @override
+  void didUpdateWidget(covariant _ProgressiveNovelImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.highRes?.toString() != oldWidget.highRes?.toString()) {
+      _highResLoaded = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final layers = <Widget>[
+      Positioned.fill(
+        child: widget.lowRes != null
+            ? Image.network(
+                widget.lowRes.toString(),
+                fit: BoxFit.cover,
+                headers: imageHeadersForUrl(widget.lowRes),
+                errorBuilder: (_, __, ___) => Container(
+                  color: widget.fallbackColor,
+                ),
+              )
+            : Container(color: widget.fallbackColor),
+      ),
+    ];
+
+    if (widget.highRes != null) {
+      layers.add(
+        Positioned.fill(
+          child: AnimatedOpacity(
+            opacity: _highResLoaded ? 1 : 0,
+            duration: const Duration(milliseconds: 320),
+            child: Image.network(
+              widget.highRes.toString(),
+              fit: BoxFit.cover,
+              headers: imageHeadersForUrl(widget.highRes),
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null && !_highResLoaded) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    setState(() => _highResLoaded = true);
+                  });
+                }
+                return child;
+              },
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+    }
+
+    layers.add(
+      Positioned.fill(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.black.withOpacity(0.35),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Stack(
+      fit: StackFit.expand,
+      children: layers,
     );
   }
 }
