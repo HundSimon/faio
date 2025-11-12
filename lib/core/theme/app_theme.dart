@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 
 /// Centralises theming for coherent styling across the app.
 abstract final class AppTheme {
-  static ThemeData get light {
-    const seed = Color(0xFF4A7BB6);
+  static const _seed = Color(0xFF4A7BB6);
+
+  static ThemeData get light => _base(brightness: Brightness.light).copyWith(
+        scaffoldBackgroundColor: Colors.grey.shade50,
+      );
+
+  static ThemeData get dark => _base(brightness: Brightness.dark).copyWith(
+        scaffoldBackgroundColor: const Color(0xFF121212),
+      );
+
+  static ThemeData _base({required Brightness brightness}) {
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
+      colorScheme: ColorScheme.fromSeed(seedColor: _seed, brightness: brightness),
       useMaterial3: true,
       visualDensity: VisualDensity.adaptivePlatformDensity,
-      scaffoldBackgroundColor: Colors.grey.shade50,
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,

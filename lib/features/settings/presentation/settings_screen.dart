@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/e621/e621_auth.dart';
 import '../../../data/pixiv/pixiv_auth.dart';
 import '../../../data/pixiv/pixiv_providers.dart';
+import '../../../core/theme/theme_mode_provider.dart';
 import 'pixiv_login_screen.dart';
 
 /// Settings hub with placeholders for upcoming configuration panels.
@@ -14,12 +15,65 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final credentials = ref.watch(e621AuthProvider);
     final pixivCredentials = ref.watch(pixivAuthProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '界面主题',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '选择浅色、深色或跟随系统外观。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<ThemeMode>(
+                    segments: const [
+                      ButtonSegment<ThemeMode>(
+                        value: ThemeMode.system,
+                        label: Text('跟随系统'),
+                        icon: Icon(Icons.brightness_auto_outlined),
+                      ),
+                      ButtonSegment<ThemeMode>(
+                        value: ThemeMode.light,
+                        label: Text('浅色'),
+                        icon: Icon(Icons.light_mode_outlined),
+                      ),
+                      ButtonSegment<ThemeMode>(
+                        value: ThemeMode.dark,
+                        label: Text('深色'),
+                        icon: Icon(Icons.dark_mode_outlined),
+                      ),
+                    ],
+                    selected: {themeMode},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) {
+                      if (selection.isNotEmpty) {
+                        ref
+                            .read(themeModeProvider.notifier)
+                            .setThemeMode(selection.first);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           Card(
             child: ListTile(
               title: const Text('e621 凭证'),
