@@ -103,7 +103,9 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
   Widget build(BuildContext context) {
     final detailAsync = ref.watch(novelDetailProvider(widget.novelId));
     final settingsAsync = ref.watch(novelReaderSettingsProvider);
-    final progressAsync = ref.watch(novelReadingProgressProvider(widget.novelId));
+    final progressAsync = ref.watch(
+      novelReadingProgressProvider(widget.novelId),
+    );
 
     return detailAsync.when(
       data: (detail) {
@@ -151,7 +153,8 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                       children: [
                         Text(
                           detail.title,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
                                 color: textColor,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -160,9 +163,8 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                           const SizedBox(height: 4),
                           Text(
                             detail.authorName!,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: palette.subtleText,
-                                ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: palette.subtleText),
                           ),
                         ],
                         const SizedBox(height: 16),
@@ -194,23 +196,16 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
               ),
             );
           },
-          loading: () => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
-          error: (error, stackTrace) => Scaffold(
-            body: Center(
-              child: Text('加载阅读设置失败：$error'),
-            ),
-          ),
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (error, stackTrace) =>
+              Scaffold(body: Center(child: Text('加载阅读设置失败：$error'))),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, stackTrace) => Scaffold(
-        appBar: AppBar(
-          title: const Text('小说阅读器'),
-        ),
+        appBar: AppBar(title: const Text('小说阅读器')),
         body: Center(child: Text('加载小说失败：$error')),
       ),
     );
@@ -232,11 +227,15 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
           child: SafeArea(
             top: false,
             child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
               child: _ReaderSettingsSheet(
                 initial: settings,
                 onChanged: (updated) {
-                  ref.read(novelReaderSettingsProvider.notifier).update(updated);
+                  ref
+                      .read(novelReaderSettingsProvider.notifier)
+                      .update(updated);
                 },
               ),
             ),
@@ -245,14 +244,10 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
       },
     );
   }
-
 }
 
 class _ReaderFooter extends StatelessWidget {
-  const _ReaderFooter({
-    required this.palette,
-    required this.progress,
-  });
+  const _ReaderFooter({required this.palette, required this.progress});
 
   final _ReaderThemePreset palette;
   final NovelReadingProgress? progress;
@@ -272,9 +267,9 @@ class _ReaderFooter extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           progress == null ? '开始阅读吧' : '阅读进度：$percent%',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: palette.subtleText,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: palette.subtleText),
         ),
       ],
     );
@@ -282,10 +277,7 @@ class _ReaderFooter extends StatelessWidget {
 }
 
 class _ReaderSettingsSheet extends StatefulWidget {
-  const _ReaderSettingsSheet({
-    required this.initial,
-    required this.onChanged,
-  });
+  const _ReaderSettingsSheet({required this.initial, required this.onChanged});
 
   final NovelReaderSettings initial;
   final ValueChanged<NovelReaderSettings> onChanged;
@@ -325,8 +317,7 @@ class _ReaderSettingsSheetState extends State<_ReaderSettingsSheet> {
     final theme = Theme.of(context);
     final baseColor =
         theme.bottomSheetTheme.backgroundColor ?? theme.colorScheme.surface;
-    final panelColor =
-        baseColor.withOpacity(_isAdjustingSlider ? 0.6 : 1.0);
+    final panelColor = baseColor.withOpacity(_isAdjustingSlider ? 0.6 : 1.0);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
