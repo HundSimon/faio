@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
+import 'package:faio/features/common/widgets/skeleton_theme.dart';
 import 'package:faio/features/library/domain/library_entries.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
 import 'package:faio/features/library/utils/library_mappers.dart';
@@ -96,33 +98,65 @@ class _NovelDetailSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant,
-              borderRadius: BorderRadius.circular(16),
+    Widget line({
+      double height = 14,
+      double? width,
+      double radius = 8,
+    }) {
+      return Skeleton.leaf(
+        child: Container(
+          height: height,
+          width: width,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            color: theme.colorScheme.surfaceVariant,
+          ),
+        ),
+      );
+    }
+
+    return Skeletonizer(
+      effect: kFaioSkeletonEffect,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Skeleton.leaf(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: AspectRatio(
+                  aspectRatio: 3 / 4,
+                  child: Container(
+                    color: theme.colorScheme.surfaceVariant,
+                  ),
+                ),
+              ),
             ),
-            alignment: Alignment.center,
-            child: const CircularProgressIndicator(),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            initialContent?.title ?? '正在加载小说详情…',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 24),
+            line(height: 30, radius: 10),
+            const SizedBox(height: 12),
+            line(height: 16, width: 160, radius: 10),
+            const SizedBox(height: 24),
+            ...List.generate(
+              4,
+              (index) => Padding(
+                padding: EdgeInsets.only(bottom: index == 3 ? 0 : 10),
+                child: line(),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            initialContent?.summary ?? '请稍候，正在获取最新内容',
-            style: theme.textTheme.bodyLarge,
-          ),
-        ],
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: line(height: 44, radius: 999),
+                ),
+                const SizedBox(width: 12),
+                line(height: 44, width: 44, radius: 999),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

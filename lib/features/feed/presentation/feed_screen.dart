@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
+import 'package:faio/features/common/widgets/skeleton_theme.dart';
 
 import '../providers/feed_providers.dart';
 
@@ -58,6 +60,7 @@ class _ResilientNetworkImage extends StatefulWidget {
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.errorBuilder,
+    this.placeholder,
   }) : assert(urls.length > 0, 'urls must not be empty');
 
   final List<Uri> urls;
@@ -65,6 +68,7 @@ class _ResilientNetworkImage extends StatefulWidget {
   final BoxFit fit;
   final AlignmentGeometry alignment;
   final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
+  final Widget? placeholder;
 
   @override
   State<_ResilientNetworkImage> createState() => _ResilientNetworkImageState();
@@ -81,6 +85,12 @@ class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
       fit: widget.fit,
       alignment: widget.alignment,
       headers: widget.headers,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return widget.placeholder ?? child;
+      },
       errorBuilder: (context, error, stackTrace) {
         if (_index < widget.urls.length - 1) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -101,6 +111,7 @@ class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
       },
     );
   }
+
 }
 
 Future<void> _showAllTags(BuildContext context, List<String> tags) async {
@@ -276,12 +287,18 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab> {
     final feedState = ref.watch(feedControllerProvider);
     final notifier = ref.read(feedControllerProvider.notifier);
     final items = feedState.items;
+    final isLoading = feedState.isLoadingInitial;
+    final shouldShowSkeleton = isLoading && items.isEmpty;
+    final showEmptyState = !isLoading && items.isEmpty;
+    final skeletonCount = shouldShowSkeleton
+        ? _estimateIllustrationSkeletonCount(context)
+        : 0;
+    final showLoadMore = !shouldShowSkeleton && feedState.hasMore;
+    final itemCount = shouldShowSkeleton
+        ? skeletonCount
+        : items.length + (showLoadMore ? 1 : 0);
 
-    if (feedState.isLoadingInitial && items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (items.isEmpty) {
+    if (showEmptyState) {
       final theme = Theme.of(context);
       return RefreshIndicator(
         onRefresh: notifier.refresh,
@@ -304,33 +321,51 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab> {
       );
     }
 
-    final itemCount = items.length + (feedState.hasMore ? 1 : 0);
-
     return RefreshIndicator(
       onRefresh: notifier.refresh,
-      child: GridView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(
-          horizontal: _horizontalPadding,
-          vertical: _verticalPadding,
+      child: Skeletonizer(
+        effect: kFaioSkeletonEffect,
+        enabled: shouldShowSkeleton,
+        child: GridView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.symmetric(
+            horizontal: _horizontalPadding,
+            vertical: _verticalPadding,
+          ),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _crossAxisCount,
+            mainAxisSpacing: _mainAxisSpacing,
+            crossAxisSpacing: _crossAxisSpacing,
+            childAspectRatio: 1,
+          ),
+          itemCount: itemCount,
+          itemBuilder: (context, index) {
+            if (shouldShowSkeleton) {
+              return const _IllustrationSkeletonTile();
+            }
+            if (showLoadMore && index >= items.length) {
+              return _LoadMoreTile(provider: feedControllerProvider);
+            }
+            final item = items[index];
+            return _IllustrationTile(item: item, index: index);
+          },
         ),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _crossAxisCount,
-          mainAxisSpacing: _mainAxisSpacing,
-          crossAxisSpacing: _crossAxisSpacing,
-          childAspectRatio: 1,
-        ),
-        itemCount: itemCount,
-        itemBuilder: (context, index) {
-          if (index >= items.length) {
-            return _LoadMoreTile(provider: feedControllerProvider);
-          }
-          final item = items[index];
-          return _IllustrationTile(item: item, index: index);
-        },
       ),
     );
   }
+
+  int _estimateIllustrationSkeletonCount(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final gridWidth =
+        size.width -
+        (_horizontalPadding * 2) -
+        (_crossAxisSpacing * (_crossAxisCount - 1));
+    final tileWidth = math.max(gridWidth / _crossAxisCount, 120.0);
+    final rowHeight = tileWidth + _mainAxisSpacing;
+    final minRows = (size.height / rowHeight).ceil() + 1;
+    return math.max(minRows * _crossAxisCount, _crossAxisCount * 4);
+  }
+
 }
 
 class _MangaTab extends ConsumerStatefulWidget {
@@ -496,7 +531,23 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
     final items = feedState.items;
 
     if (feedState.isLoadingInitial && items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      final size = MediaQuery.of(context).size;
+      const estimatedItemHeight = 180.0;
+      final skeletonCount =
+          math.max(6, (size.height / estimatedItemHeight).ceil() + 2);
+      return RefreshIndicator(
+        onRefresh: notifier.refresh,
+        child: Skeletonizer(
+          effect: kFaioSkeletonEffect,
+          child: ListView.builder(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            itemCount: skeletonCount,
+            itemBuilder: (context, index) => const _NovelListSkeletonItem(),
+          ),
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -589,6 +640,21 @@ class _IllustrationTile extends ConsumerWidget {
         ref.read(feedSelectionProvider.notifier).select(index);
         context.push('/feed/detail', extra: index);
       },
+    );
+  }
+}
+
+class _IllustrationSkeletonTile extends StatelessWidget {
+  const _IllustrationSkeletonTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceVariant;
+    return Skeleton.leaf(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(color: color),
+      ),
     );
   }
 }
@@ -929,6 +995,93 @@ class _NovelListItem extends StatelessWidget {
   }
 }
 
+class _NovelListSkeletonItem extends StatelessWidget {
+  const _NovelListSkeletonItem();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardColor = Color.alphaBlend(
+      theme.colorScheme.surfaceVariant.withOpacity(
+        theme.brightness == Brightness.dark ? 0.28 : 0.2,
+      ),
+      theme.colorScheme.surface,
+    );
+    const coverWidth = 128.0;
+    const coverHeight = 180.0;
+
+    Widget line({
+      double height = 14,
+      double? width,
+      double radius = 6,
+    }) {
+      return Skeleton.leaf(
+        child: Container(
+          height: height,
+          width: width,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      color: cardColor,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Skeleton.leaf(
+              child: Container(
+                width: coverWidth,
+                height: coverHeight,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: theme.colorScheme.surfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  line(height: 20, radius: 8),
+                  const SizedBox(height: 8),
+                  line(height: 16, width: 160, radius: 8),
+                  const SizedBox(height: 12),
+                  line(),
+                  const SizedBox(height: 6),
+                  line(width: 220),
+                  const SizedBox(height: 6),
+                  line(width: 180),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: line(height: 20, radius: 999),
+                      ),
+                      const SizedBox(width: 12),
+                      line(height: 20, width: 52, radius: 999),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ContentTile extends StatelessWidget {
   const _ContentTile({required this.item, this.onTap});
 
@@ -939,14 +1092,17 @@ class _ContentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final preview = item.previewUrl ?? item.sampleUrl;
-    Widget placeholder(IconData icon) {
+    Widget placeholder({IconData? icon}) {
       return Container(
         color: theme.colorScheme.surfaceVariant,
         alignment: Alignment.center,
-        child: Icon(icon, color: theme.colorScheme.onSurfaceVariant),
+        child: icon == null
+            ? null
+            : Icon(icon, color: theme.colorScheme.onSurfaceVariant),
       );
     }
 
+    final loadingPlaceholder = placeholder();
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(12),
@@ -958,9 +1114,11 @@ class _ContentTile extends StatelessWidget {
                 urls: _imageUrlCandidates(preview),
                 headers: _imageHeadersFor(item, url: preview),
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => placeholder(Icons.broken_image),
+                placeholder: loadingPlaceholder,
+                errorBuilder: (_, __, ___) =>
+                    placeholder(icon: Icons.broken_image),
               )
-            : placeholder(Icons.image),
+            : placeholder(icon: Icons.image),
       ),
     );
   }

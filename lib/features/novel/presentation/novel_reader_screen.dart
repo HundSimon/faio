@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
+import 'package:faio/features/common/widgets/skeleton_theme.dart';
 
 import '../providers/novel_providers.dart';
 
@@ -197,13 +199,13 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
             );
           },
           loading: () =>
-              const Scaffold(body: Center(child: CircularProgressIndicator())),
+              const _NovelReaderSkeleton(),
           error: (error, stackTrace) =>
               Scaffold(body: Center(child: Text('加载阅读设置失败：$error'))),
         );
       },
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+          const _NovelReaderSkeleton(),
       error: (error, stackTrace) => Scaffold(
         appBar: AppBar(title: const Text('小说阅读器')),
         body: Center(child: Text('加载小说失败：$error')),
@@ -410,6 +412,59 @@ class _ReaderSettingsSheetState extends State<_ReaderSettingsSheet> {
                 child: const Text('恢复默认'),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NovelReaderSkeleton extends StatelessWidget {
+  const _NovelReaderSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Widget line({
+      double height = 14,
+      double? width,
+      double radius = 6,
+    }) {
+      return Skeleton.leaf(
+        child: Container(
+          height: height,
+          width: width,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('小说阅读器')),
+      body: Skeletonizer(
+        effect: kFaioSkeletonEffect,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          children: [
+            line(height: 30, width: 220, radius: 10),
+            const SizedBox(height: 12),
+            line(height: 16, width: 140, radius: 10),
+            const SizedBox(height: 24),
+            ...List.generate(
+              10,
+              (index) => Padding(
+                padding: EdgeInsets.only(bottom: index == 9 ? 0 : 12),
+                child: line(),
+              ),
+            ),
+            const SizedBox(height: 28),
+            line(height: 8, radius: 999),
+            const SizedBox(height: 8),
+            line(height: 12, width: 120),
           ],
         ),
       ),

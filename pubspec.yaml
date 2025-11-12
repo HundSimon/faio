@@ -46,6 +46,7 @@ dependencies:
   url_launcher: ^6.3.0
   webview_flutter: ^4.8.0
   webview_flutter_android: ^4.10.5
+  skeletonizer: ^2.1.0+1
 
 dev_dependencies:
   flutter_test:
