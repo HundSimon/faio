@@ -224,16 +224,22 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
+        final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
         return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-          ),
-          child: _ReaderSettingsSheet(
-            initial: settings,
-            onChanged: (updated) {
-              ref.read(novelReaderSettingsProvider.notifier).update(updated);
-            },
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: SafeArea(
+            top: false,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              child: _ReaderSettingsSheet(
+                initial: settings,
+                onChanged: (updated) {
+                  ref.read(novelReaderSettingsProvider.notifier).update(updated);
+                },
+              ),
+            ),
           ),
         );
       },
@@ -290,6 +296,7 @@ class _ReaderSettingsSheet extends StatefulWidget {
 
 class _ReaderSettingsSheetState extends State<_ReaderSettingsSheet> {
   late NovelReaderSettings _settings;
+  bool _isAdjustingSlider = false;
 
   @override
   void initState() {
@@ -304,93 +311,116 @@ class _ReaderSettingsSheetState extends State<_ReaderSettingsSheet> {
     widget.onChanged(next);
   }
 
+  void _setSliderInteraction(bool isActive) {
+    if (_isAdjustingSlider == isActive) {
+      return;
+    }
+    setState(() {
+      _isAdjustingSlider = isActive;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final palette = _ReaderThemePreset.resolve(_settings.themeId);
+    final baseColor =
+        theme.bottomSheetTheme.backgroundColor ?? theme.colorScheme.surface;
+    final panelColor =
+        baseColor.withOpacity(_isAdjustingSlider ? 0.6 : 1.0);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '阅读设置',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      color: panelColor,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '阅读设置',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          _SettingsSection(
-            label: '字体',
-            child: Wrap(
-              spacing: 8,
-              children: _ReaderFontOption.values.map((option) {
-                final isSelected = option.id == _settings.fontFamily;
-                return ChoiceChip(
-                  label: Text(option.label),
-                  selected: isSelected,
-                  onSelected: (_) =>
-                      _update(_settings.copyWith(fontFamily: option.id)),
-                );
-              }).toList(),
+            const SizedBox(height: 16),
+            _SettingsSection(
+              label: '字体',
+              child: Wrap(
+                spacing: 8,
+                children: _ReaderFontOption.values.map((option) {
+                  final isSelected = option.id == _settings.fontFamily;
+                  return ChoiceChip(
+                    label: Text(option.label),
+                    selected: isSelected,
+                    onSelected: (_) =>
+                        _update(_settings.copyWith(fontFamily: option.id)),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-          _SettingsSection(
-            label: '文字大小 (${_settings.fontSize.toStringAsFixed(0)}sp)',
-            child: Slider(
-              value: _settings.fontSize,
-              min: 14,
-              max: 28,
-              onChanged: (value) =>
-                  _update(_settings.copyWith(fontSize: value)),
+            _SettingsSection(
+              label: '文字大小 (${_settings.fontSize.toStringAsFixed(0)}sp)',
+              child: Slider(
+                value: _settings.fontSize,
+                min: 14,
+                max: 28,
+                onChanged: (value) =>
+                    _update(_settings.copyWith(fontSize: value)),
+                onChangeStart: (_) => _setSliderInteraction(true),
+                onChangeEnd: (_) => _setSliderInteraction(false),
+              ),
             ),
-          ),
-          _SettingsSection(
-            label: '行距 (${_settings.lineHeight.toStringAsFixed(1)})',
-            child: Slider(
-              value: _settings.lineHeight,
-              min: 1.2,
-              max: 2.2,
-              onChanged: (value) =>
-                  _update(_settings.copyWith(lineHeight: value)),
+            _SettingsSection(
+              label: '行距 (${_settings.lineHeight.toStringAsFixed(1)})',
+              child: Slider(
+                value: _settings.lineHeight,
+                min: 1.2,
+                max: 2.2,
+                onChanged: (value) =>
+                    _update(_settings.copyWith(lineHeight: value)),
+                onChangeStart: (_) => _setSliderInteraction(true),
+                onChangeEnd: (_) => _setSliderInteraction(false),
+              ),
             ),
-          ),
-          _SettingsSection(
-            label: '段落间距 (${_settings.paragraphSpacing.toStringAsFixed(0)}dp)',
-            child: Slider(
-              value: _settings.paragraphSpacing,
-              min: 6,
-              max: 28,
-              onChanged: (value) =>
-                  _update(_settings.copyWith(paragraphSpacing: value)),
+            _SettingsSection(
+              label:
+                  '段落间距 (${_settings.paragraphSpacing.toStringAsFixed(0)}dp)',
+              child: Slider(
+                value: _settings.paragraphSpacing,
+                min: 6,
+                max: 28,
+                onChanged: (value) =>
+                    _update(_settings.copyWith(paragraphSpacing: value)),
+                onChangeStart: (_) => _setSliderInteraction(true),
+                onChangeEnd: (_) => _setSliderInteraction(false),
+              ),
             ),
-          ),
-          _SettingsSection(
-            label: '背景主题',
-            child: Wrap(
-              spacing: 8,
-              children: _ReaderThemePreset.presets.map((preset) {
-                final isSelected = preset.id == _settings.themeId;
-                return ChoiceChip(
-                  label: Text(preset.label),
-                  selected: isSelected,
-                  onSelected: (_) =>
-                      _update(_settings.copyWith(themeId: preset.id)),
-                );
-              }).toList(),
+            _SettingsSection(
+              label: '背景主题',
+              child: Wrap(
+                spacing: 8,
+                children: _ReaderThemePreset.presets.map((preset) {
+                  final isSelected = preset.id == _settings.themeId;
+                  return ChoiceChip(
+                    label: Text(preset.label),
+                    selected: isSelected,
+                    onSelected: (_) =>
+                        _update(_settings.copyWith(themeId: preset.id)),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => _update(const NovelReaderSettings()),
-              child: const Text('恢复默认'),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _update(const NovelReaderSettings()),
+                child: const Text('恢复默认'),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
