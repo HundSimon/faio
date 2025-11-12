@@ -13,6 +13,7 @@ import 'package:faio/features/library/domain/library_entries.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
 import 'package:faio/features/library/utils/library_mappers.dart';
 import 'package:faio/features/library/presentation/widgets/favorite_icon_button.dart';
+import 'package:faio/features/novel/presentation/novel_hero.dart';
 
 import '../providers/novel_providers.dart';
 import 'widgets/novel_image.dart';
@@ -98,6 +99,8 @@ class _NovelDetailSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final initialCoverUrl =
+        initialContent?.sampleUrl ?? initialContent?.previewUrl;
     Widget line({
       double height = 14,
       double? width,
@@ -122,16 +125,10 @@ class _NovelDetailSkeleton extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Skeleton.leaf(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: AspectRatio(
-                  aspectRatio: 3 / 4,
-                  child: Container(
-                    color: theme.colorScheme.surfaceVariant,
-                  ),
-                ),
-              ),
+            _NovelHeroImage(
+              contentId: initialContent?.id,
+              coverUrl: initialCoverUrl,
+              fallbackColor: theme.colorScheme.surfaceVariant,
             ),
             const SizedBox(height: 24),
             line(height: 30, radius: 10),
@@ -242,52 +239,10 @@ class _NovelDetailContent extends ConsumerWidget {
             : null);
 
     Widget buildHero() {
-      if (coverUrl == null) {
-        return Container(
-          height: 260,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            Icons.menu_book_outlined,
-            size: 48,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        );
-      }
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            AspectRatio(
-              aspectRatio: 0.75,
-              child: ResilientNetworkImage(
-                urls: imageUrlCandidates(coverUrl),
-                headers: imageHeadersForUrl(coverUrl),
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: theme.colorScheme.surfaceVariant,
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.35),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      return _NovelHeroImage(
+        contentId: favoriteEntry.id,
+        coverUrl: coverUrl,
+        fallbackColor: theme.colorScheme.surfaceVariant,
       );
     }
 
@@ -768,6 +723,82 @@ class _InfoPill extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NovelHeroImage extends StatelessWidget {
+  const _NovelHeroImage({
+    required this.contentId,
+    this.coverUrl,
+    this.fallbackColor,
+  });
+
+  final String? contentId;
+  final Uri? coverUrl;
+  final Color? fallbackColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget child;
+    if (coverUrl == null) {
+      child = Container(
+        height: 260,
+        decoration: BoxDecoration(
+          color: fallbackColor ?? theme.colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          Icons.menu_book_outlined,
+          size: 48,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      );
+    } else {
+      child = ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            AspectRatio(
+              aspectRatio: 0.75,
+              child: ResilientNetworkImage(
+                urls: imageUrlCandidates(coverUrl!),
+                headers: imageHeadersForUrl(coverUrl),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: theme.colorScheme.surfaceVariant,
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.35),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (contentId == null) {
+      return child;
+    }
+
+    return Hero(
+      tag: novelHeroTag(contentId!),
+      transitionOnUserGestures: true,
+      child: child,
     );
   }
 }

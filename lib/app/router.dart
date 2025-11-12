@@ -45,7 +45,7 @@ final appRouterProvider = Provider<GoRouter>(
                   GoRoute(
                     path: 'detail',
                     name: AppRoute.feedDetail,
-                    builder: (context, state) {
+                    pageBuilder: (context, state) {
                       int? index;
                       final extra = state.extra;
                       if (extra is int) {
@@ -58,15 +58,23 @@ final appRouterProvider = Provider<GoRouter>(
                       }
 
                       if (index == null) {
-                        return const _RouteErrorScreen();
+                        return CustomTransitionPage<void>(
+                          key: state.pageKey,
+                          child: const _RouteErrorScreen(),
+                          transitionsBuilder: _detailPageTransitionBuilder,
+                        );
                       }
-                      return IllustrationDetailScreen(initialIndex: index);
+                      return CustomTransitionPage<void>(
+                        key: state.pageKey,
+                        child: IllustrationDetailScreen(initialIndex: index),
+                        transitionsBuilder: _detailPageTransitionBuilder,
+                      );
                     },
                   ),
                   GoRoute(
                     path: 'novel/:novelId',
                     name: AppRoute.feedNovelDetail,
-                    builder: (context, state) {
+                    pageBuilder: (context, state) {
                       final novelIdParam = state.pathParameters['novelId'];
                       final novelId = novelIdParam != null
                           ? int.tryParse(novelIdParam)
@@ -77,11 +85,19 @@ final appRouterProvider = Provider<GoRouter>(
                         initialContent = extra;
                       }
                       if (novelId == null) {
-                        return const _RouteErrorScreen();
+                        return CustomTransitionPage<void>(
+                          key: state.pageKey,
+                          child: const _RouteErrorScreen(),
+                          transitionsBuilder: _detailPageTransitionBuilder,
+                        );
                       }
-                      return NovelDetailScreen(
-                        novelId: novelId,
-                        initialContent: initialContent,
+                      return CustomTransitionPage<void>(
+                        key: state.pageKey,
+                        child: NovelDetailScreen(
+                          novelId: novelId,
+                          initialContent: initialContent,
+                        ),
+                        transitionsBuilder: _detailPageTransitionBuilder,
                       );
                     },
                     routes: [
@@ -148,4 +164,24 @@ class _RouteErrorScreen extends StatelessWidget {
       body: const Center(child: Text('未找到内容')),
     );
   }
+}
+
+Widget _detailPageTransitionBuilder(
+  BuildContext context,
+  Animation<double> animation,
+  Animation<double> secondaryAnimation,
+  Widget child,
+) {
+  final curved = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
+  return FadeTransition(
+    opacity: curved,
+    child: ScaleTransition(
+      scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
+      child: child,
+    ),
+  );
 }

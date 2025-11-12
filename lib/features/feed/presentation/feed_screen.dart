@@ -8,8 +8,10 @@ import 'package:skeletonizer/skeletonizer.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
+import 'package:faio/features/novel/presentation/novel_hero.dart';
 
 import '../providers/feed_providers.dart';
+import 'illustration_hero.dart';
 
 const _pixivFallbackHosts = ['i.pixiv.cat', 'i.pixiv.re', 'i.pixiv.nl'];
 
@@ -743,8 +745,9 @@ class _NovelListItem extends StatelessWidget {
 
     Widget buildImage() {
       final borderRadius = BorderRadius.circular(12);
+      Widget child;
       if (previewUrl == null) {
-        return ClipRRect(
+        child = ClipRRect(
           borderRadius: borderRadius,
           child: Container(
             color: theme.colorScheme.surfaceVariant,
@@ -755,24 +758,30 @@ class _NovelListItem extends StatelessWidget {
             ),
           ),
         );
-      }
-      final urls = _imageUrlCandidates(previewUrl);
-      final headers = _imageHeadersFor(item, url: previewUrl);
-      return ClipRRect(
-        borderRadius: borderRadius,
-        child: _ResilientNetworkImage(
-          urls: urls,
-          headers: headers,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            color: theme.colorScheme.surfaceVariant,
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.broken_image,
-              color: theme.colorScheme.onSurfaceVariant,
+      } else {
+        final urls = _imageUrlCandidates(previewUrl);
+        final headers = _imageHeadersFor(item, url: previewUrl);
+        child = ClipRRect(
+          borderRadius: borderRadius,
+          child: _ResilientNetworkImage(
+            urls: urls,
+            headers: headers,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: theme.colorScheme.surfaceVariant,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.broken_image,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-        ),
+        );
+      }
+      return Hero(
+        tag: novelHeroTag(item.id),
+        transitionOnUserGestures: true,
+        child: child,
       );
     }
 
@@ -1103,22 +1112,26 @@ class _ContentTile extends StatelessWidget {
     }
 
     final loadingPlaceholder = placeholder();
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: preview != null
-            ? _ResilientNetworkImage(
-                urls: _imageUrlCandidates(preview),
-                headers: _imageHeadersFor(item, url: preview),
-                fit: BoxFit.cover,
-                placeholder: loadingPlaceholder,
-                errorBuilder: (_, __, ___) =>
-                    placeholder(icon: Icons.broken_image),
-              )
-            : placeholder(icon: Icons.image),
+    return Hero(
+      tag: illustrationHeroTag(item.id),
+      transitionOnUserGestures: true,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: preview != null
+              ? _ResilientNetworkImage(
+                  urls: _imageUrlCandidates(preview),
+                  headers: _imageHeadersFor(item, url: preview),
+                  fit: BoxFit.cover,
+                  placeholder: loadingPlaceholder,
+                  errorBuilder: (_, __, ___) =>
+                      placeholder(icon: Icons.broken_image),
+                )
+              : placeholder(icon: Icons.image),
+        ),
       ),
     );
   }
