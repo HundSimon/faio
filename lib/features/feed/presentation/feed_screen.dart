@@ -627,7 +627,7 @@ class _NovelListItem extends StatelessWidget {
 
     final portraitAspectRatio =
         (aspectRatio > 1 ? 1 / aspectRatio : aspectRatio)
-            .clamp(0.45, 0.85)
+            .clamp(0.5, 0.85)
             .toDouble();
     final summaryText = hasSummary ? item.summary : '暂无简介';
     final authorName = item.authorName?.trim();
@@ -680,15 +680,12 @@ class _NovelListItem extends StatelessWidget {
       if (previewUrl == null) {
         return ClipRRect(
           borderRadius: borderRadius,
-          child: AspectRatio(
-            aspectRatio: portraitAspectRatio,
-            child: Container(
-              color: theme.colorScheme.surfaceVariant,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.menu_book,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+          child: Container(
+            color: theme.colorScheme.surfaceVariant,
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.menu_book,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         );
@@ -697,19 +694,16 @@ class _NovelListItem extends StatelessWidget {
       final headers = _imageHeadersFor(item, url: previewUrl);
       return ClipRRect(
         borderRadius: borderRadius,
-        child: AspectRatio(
-          aspectRatio: portraitAspectRatio,
-          child: _ResilientNetworkImage(
-            urls: urls,
-            headers: headers,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: theme.colorScheme.surfaceVariant,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.broken_image,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+        child: _ResilientNetworkImage(
+          urls: urls,
+          headers: headers,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: theme.colorScheme.surfaceVariant,
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.broken_image,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -717,7 +711,7 @@ class _NovelListItem extends StatelessWidget {
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       color: cardColor,
       clipBehavior: Clip.antiAlias,
@@ -737,15 +731,20 @@ class _NovelListItem extends StatelessWidget {
         },
         splashColor: theme.colorScheme.primary.withOpacity(0.08),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final maxWidth = constraints.maxWidth;
               final coverWidth = math.max(
-                120.0,
-                math.min(maxWidth * 0.32, 164.0),
+                108.0,
+                math.min(maxWidth * 0.28, 148.0),
               );
-              final imageHeight = coverWidth / portraitAspectRatio;
+              const maxImageHeight = 180.0;
+              final constrainedAspectRatio = math.max(
+                portraitAspectRatio,
+                coverWidth / maxImageHeight,
+              );
+              final imageHeight = coverWidth / constrainedAspectRatio;
 
               Widget buildTagChip(
                 String label, {
@@ -758,8 +757,8 @@ class _NovelListItem extends StatelessWidget {
                 final borderRadius = BorderRadius.circular(999);
                 final chip = Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: 10,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     borderRadius: borderRadius,
@@ -816,12 +815,12 @@ class _NovelListItem extends StatelessWidget {
                 final badgeRowChildren = <Widget>[favorite];
 
                 if (highlightAdult) {
-                  badgeRowChildren.add(const SizedBox(width: 12));
+                  badgeRowChildren.add(const SizedBox(width: 10));
                   badgeRowChildren.add(
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+                        horizontal: 9,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.error.withOpacity(0.14),
@@ -856,7 +855,7 @@ class _NovelListItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: badgeRowChildren),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -871,16 +870,14 @@ class _NovelListItem extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: coverWidth,
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(height: imageHeight, child: buildImage()),
-                    ),
+                    height: imageHeight,
+                    child: buildImage(),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -890,7 +887,7 @@ class _NovelListItem extends StatelessWidget {
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             if (hasAuthor) ...[
@@ -904,10 +901,10 @@ class _NovelListItem extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Text(
                               summaryText,
-                              maxLines: 3,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: hasSummary
@@ -917,7 +914,7 @@ class _NovelListItem extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         buildMetaSection(),
                       ],
                     ),
