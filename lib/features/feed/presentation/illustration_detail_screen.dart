@@ -344,6 +344,7 @@ class _IllustrationDetailView extends StatelessWidget {
       return Hero(
         tag: illustrationHeroTag(content.id),
         transitionOnUserGestures: true,
+        createRectTween: illustrationHeroRectTween,
         child: heroChild,
       );
     }

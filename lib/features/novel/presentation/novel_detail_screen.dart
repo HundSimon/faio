@@ -800,6 +800,7 @@ class _NovelHeroImage extends StatelessWidget {
     return Hero(
       tag: novelHeroTag(contentId!),
       transitionOnUserGestures: true,
+      createRectTween: novelHeroRectTween,
       child: child,
     );
   }

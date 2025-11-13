@@ -785,6 +785,7 @@ class _NovelListItem extends StatelessWidget {
       return Hero(
         tag: novelHeroTag(item.id),
         transitionOnUserGestures: true,
+        createRectTween: novelHeroRectTween,
         child: child,
       );
     }
@@ -1119,6 +1120,7 @@ class _ContentTile extends StatelessWidget {
     return Hero(
       tag: illustrationHeroTag(item.id),
       transitionOnUserGestures: true,
+      createRectTween: illustrationHeroRectTween,
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
