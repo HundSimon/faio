@@ -363,14 +363,6 @@ class _IllustrationDetailView extends StatelessWidget {
               onPressed: onToggleFavorite,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.open_in_new),
-              label: Text(primaryLink == null ? '暂无外链' : '打开原站'),
-              onPressed: primaryLink == null ? null : () => onOpenSource(primaryLink!),
-            ),
-          ),
         ],
       );
     }

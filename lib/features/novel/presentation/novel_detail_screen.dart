@@ -158,6 +158,7 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
     return null;
   }
 
+
   int _novelIdForIndex(List<FaioContent> items, int index) {
     if (index >= 0 && index < items.length) {
       return parseContentNumericId(items[index]) ?? widget.novelId;
@@ -539,16 +540,6 @@ class _NovelDetailContent extends ConsumerWidget {
               },
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.open_in_new),
-              label: Text(primaryLink == null ? '暂无外链' : '打开原站'),
-              onPressed: primaryLink == null
-                  ? null
-                  : () => _launchExternal(context, primaryLink),
-            ),
-          ),
         ],
       );
     }
@@ -654,6 +645,16 @@ class _NovelDetailContent extends ConsumerWidget {
                       );
                     }
                   },
+            onRetryProgress: () {
+              ref.invalidate(novelReadingProgressProvider(novelId));
+            },
+            onOpenChapters: detail.series?.isValid ?? false
+                ? () => _openNovelChapterSelector(
+                      context,
+                      detail.series!,
+                      novelId,
+                    )
+                : null,
           ),
           const SizedBox(height: 16),
           DetailSectionCard(
@@ -704,6 +705,23 @@ class _NovelDetailContent extends ConsumerWidget {
   }
 }
 
+Future<void> _openNovelChapterSelector(
+  BuildContext context,
+  NovelSeriesOutline series,
+  int currentNovelId,
+) async {
+  final selected = await showNovelSeriesSheet(
+    context: context,
+    seriesId: series.id,
+    currentNovelId: currentNovelId,
+  );
+  if (selected == null || selected == currentNovelId) {
+    return;
+  }
+  if (!context.mounted) return;
+  context.pushReplacement('/feed/novel/$selected');
+}
+
 class _ReadActionCard extends StatelessWidget {
   const _ReadActionCard({
     required this.detail,
@@ -711,6 +729,8 @@ class _ReadActionCard extends StatelessWidget {
     required this.progressAsync,
     required this.onReadPressed,
     this.onClearProgress,
+    this.onRetryProgress,
+    this.onOpenChapters,
   });
 
   final NovelDetail detail;
@@ -718,65 +738,277 @@ class _ReadActionCard extends StatelessWidget {
   final AsyncValue<NovelReadingProgress?> progressAsync;
   final VoidCallback onReadPressed;
   final VoidCallback? onClearProgress;
+  final VoidCallback? onRetryProgress;
+  final VoidCallback? onOpenChapters;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final progress = progressAsync.valueOrNull;
-    final percent =
-        (progress?.relativeOffset ?? 0) * 100;
+    final hasProgress = progress != null;
+    final percent = (progress?.relativeOffset ?? 0).clamp(0.0, 1.0) * 100;
     final formattedPercent = percent.toStringAsFixed(0);
+    final onCard = theme.colorScheme.onSurface;
+    final onCardMuted = theme.colorScheme.onSurfaceVariant;
+
+    final statusText = hasProgress
+        ? '继续阅读 · 已读 $formattedPercent%'
+        : '开始阅读 · 还未开始';
+
+    Widget trailingStatus;
+    if (progressAsync.isLoading) {
+      trailingStatus = const SizedBox(
+        key: ValueKey('status-loading'),
+        height: 20,
+        width: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    } else if (progressAsync.hasError) {
+      trailingStatus = _ReadStatusChip(
+        key: const ValueKey('status-error'),
+        label: '同步失败',
+        icon: Icons.warning_amber_rounded,
+        background: theme.colorScheme.errorContainer,
+        foreground: theme.colorScheme.onErrorContainer,
+      );
+    } else if (hasProgress) {
+      trailingStatus = _ReadStatusChip(
+        key: const ValueKey('status-sync'),
+        label: '上次同步 ${_formatRelativeTime(progress!.updatedAt)}',
+        foreground: onCardMuted,
+      );
+    } else {
+      trailingStatus = const SizedBox(
+        key: ValueKey('status-empty'),
+        width: 0,
+        height: 0,
+      );
+    }
+
+    Widget buildProgressVisual() {
+      if (progressAsync.hasError) {
+        return Column(
+          key: const ValueKey('progress-error'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '阅读进度同步失败，请稍后重试',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            if (onRetryProgress != null) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: onRetryProgress,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('重新获取进度'),
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ],
+        );
+      }
+      if (hasProgress) {
+        return Column(
+          key: const ValueKey('progress-filled'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LinearProgressIndicator(
+              value: progress!.relativeOffset.clamp(0.0, 1.0),
+              minHeight: 6,
+              color: theme.colorScheme.primary,
+              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '已读 $formattedPercent% · 更新于 ${_formatDate(progress.updatedAt)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: onCardMuted,
+              ),
+            ),
+          ],
+        );
+      }
+      return Column(
+        key: const ValueKey('progress-empty'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _GradientProgressTrack(
+            startColor: theme.colorScheme.primary.withOpacity(0.18),
+            endColor: theme.colorScheme.primary.withOpacity(0.05),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '还未开始，点击上方开始阅读',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: onCardMuted,
+            ),
+          ),
+        ],
+      );
+    }
+
+    final canClearProgress = hasProgress && onClearProgress != null;
 
     return Card(
-      color: theme.colorScheme.surfaceVariant,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            FilledButton.icon(
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    statusText,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: onCard,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: trailingStatus,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
               onPressed: onReadPressed,
-              icon: const Icon(Icons.menu_book),
-              label: Text(
-                progress == null ? '开始阅读' : '继续阅读（已读 $formattedPercent%）',
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      hasProgress ? '继续阅读' : '开始阅读',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded),
+                ],
               ),
             ),
-            if (progressAsync.isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: LinearProgressIndicator(),
-              )
-            else if (progressAsync.hasError) ...[
-              const SizedBox(height: 8),
-              Text(
-                '无法获取阅读进度',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              ),
-            ]
-            else if (progress != null) ...[
+            const SizedBox(height: 16),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: buildProgressVisual(),
+            ),
+            if (canClearProgress || onOpenChapters != null) ...[
               const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: progress.relativeOffset.clamp(0.0, 1.0),
-              ),
-              const SizedBox(height: 8),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '上次阅读：'
-                    '${_formatDate(progress.updatedAt)}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  TextButton(
-                    onPressed: onClearProgress,
-                    child: const Text('清除进度'),
-                  ),
+                  if (canClearProgress)
+                    TextButton.icon(
+                      onPressed: onClearProgress,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('清除进度'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.colorScheme.primary,
+                      ),
+                    ),
+                  if (onOpenChapters != null)
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: onOpenChapters,
+                          icon: const Icon(Icons.view_list_rounded),
+                          label: const Text('章节列表'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadStatusChip extends StatelessWidget {
+  const _ReadStatusChip({
+    super.key,
+    required this.label,
+    this.icon,
+    this.background,
+    this.foreground,
+  });
+
+  final String label;
+  final IconData? icon;
+  final Color? background;
+  final Color? foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bg = background ??
+        theme.colorScheme.onSurface.withOpacity(
+          theme.brightness == Brightness.dark ? 0.14 : 0.12,
+        );
+    final fg = foreground ?? theme.colorScheme.onSurface;
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: fg),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GradientProgressTrack extends StatelessWidget {
+  const _GradientProgressTrack({
+    required this.startColor,
+    required this.endColor,
+  });
+
+  final Color startColor;
+  final Color endColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 6,
+      width: double.infinity,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [startColor, endColor],
+          ),
+          borderRadius: BorderRadius.circular(999),
         ),
       ),
     );
@@ -958,6 +1190,37 @@ String _formatDate(DateTime dateTime) {
   final two = (int value) => value.toString().padLeft(2, '0');
   return '${local.year}-${two(local.month)}-${two(local.day)} '
       '${two(local.hour)}:${two(local.minute)}';
+}
+
+String _formatRelativeTime(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  final now = DateTime.now();
+  final diff = now.difference(local);
+  if (diff.isNegative) {
+    return '刚刚';
+  }
+  if (diff.inMinutes < 1) {
+    return '刚刚';
+  }
+  if (diff.inHours < 1) {
+    return '${diff.inMinutes} 分钟前';
+  }
+  if (diff.inDays < 1) {
+    return '${diff.inHours} 小时前';
+  }
+  if (diff.inDays < 7) {
+    return '${diff.inDays} 天前';
+  }
+  if (diff.inDays < 30) {
+    final weeks = (diff.inDays / 7).floor();
+    return '$weeks 周前';
+  }
+  if (diff.inDays < 365) {
+    final months = (diff.inDays / 30).floor();
+    return '$months 个月前';
+  }
+  final years = (diff.inDays / 365).floor();
+  return '$years 年前';
 }
 
 class _InfoPill extends StatelessWidget {
