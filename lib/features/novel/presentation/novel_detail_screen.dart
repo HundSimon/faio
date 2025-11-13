@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,8 +10,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
+import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
+import 'package:faio/features/feed/providers/feed_providers.dart';
 import 'package:faio/features/library/domain/library_entries.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
 import 'package:faio/features/library/utils/library_mappers.dart';
@@ -20,15 +24,24 @@ import '../providers/novel_providers.dart';
 import 'widgets/novel_image.dart';
 import 'widgets/novel_series_sheet.dart';
 
+class NovelDetailRouteExtra {
+  const NovelDetailRouteExtra({this.initialContent, this.initialIndex});
+
+  final FaioContent? initialContent;
+  final int? initialIndex;
+}
+
 class NovelDetailScreen extends ConsumerStatefulWidget {
   const NovelDetailScreen({
     required this.novelId,
     this.initialContent,
+    this.initialIndex,
     super.key,
   });
 
   final int novelId;
   final FaioContent? initialContent;
+  final int? initialIndex;
 
   @override
   ConsumerState<NovelDetailScreen> createState() => _NovelDetailScreenState();
@@ -36,6 +49,68 @@ class NovelDetailScreen extends ConsumerStatefulWidget {
 
 class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
   String? _lastRecordedContentId;
+  PageController? _pageController;
+  int? _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialIndex = widget.initialIndex;
+    if (initialIndex != null) {
+      _setPagerIndex(initialIndex);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController?.dispose();
+    super.dispose();
+  }
+
+  void _setPagerIndex(int index, {bool useSetState = false}) {
+    void assign() {
+      _currentIndex = index;
+      _pageController = PageController(initialPage: index);
+      _lastRecordedContentId = null;
+    }
+
+    if (useSetState) {
+      setState(assign);
+    } else {
+      assign();
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(novelFeedSelectionProvider.notifier).select(index);
+      ref
+          .read(pixivNovelFeedControllerProvider.notifier)
+          .ensureIndexLoaded(index);
+    });
+  }
+
+  Future<void> _animateToIndex(int index) async {
+    final controller = _pageController;
+    if (controller == null || !controller.hasClients) {
+      return;
+    }
+    await controller.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _handlePageChanged(int index) {
+    setState(() {
+      _currentIndex = index;
+      _lastRecordedContentId = null;
+    });
+    ref.read(novelFeedSelectionProvider.notifier).select(index);
+    ref.read(pixivNovelFeedControllerProvider.notifier).ensureIndexLoaded(
+      index + 1,
+    );
+  }
 
   void _recordHistory(FaioContent content, {bool force = false}) {
     if (!force && _lastRecordedContentId == content.id) {
@@ -48,60 +123,239 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
     });
   }
 
+  void _requestScrollBack() {
+    final index = _currentIndex;
+    if (index == null) {
+      return;
+    }
+    ref.read(novelFeedSelectionProvider.notifier).requestScrollTo(index);
+  }
+
+  void _maybeAttachPagerFromFeed(List<FaioContent> items) {
+    if (_pageController != null || items.isEmpty) {
+      return;
+    }
+    final targetIndex = _findIndexForCurrent(items);
+    if (targetIndex != null) {
+      _setPagerIndex(targetIndex, useSetState: true);
+    }
+  }
+
+  int? _findIndexForCurrent(List<FaioContent> items) {
+    final byContentId = widget.initialContent?.id;
+    if (byContentId != null) {
+      final match = items.indexWhere((item) => item.id == byContentId);
+      if (match >= 0) {
+        return match;
+      }
+    }
+    final matchByNovelId = items.indexWhere(
+      (item) => parseContentNumericId(item) == widget.novelId,
+    );
+    if (matchByNovelId >= 0) {
+      return matchByNovelId;
+    }
+    return null;
+  }
+
+  int _novelIdForIndex(List<FaioContent> items, int index) {
+    if (index >= 0 && index < items.length) {
+      return parseContentNumericId(items[index]) ?? widget.novelId;
+    }
+    return widget.novelId;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final detailAsync = ref.watch(novelDetailProvider(widget.novelId));
-    final progressAsync =
-        ref.watch(novelReadingProgressProvider(widget.novelId));
-    final title = detailAsync.maybeWhen(
+    ref.listen<NovelFeedSelectionState>(
+        novelFeedSelectionProvider, (previous, next) {
+      if (!mounted) return;
+      final selected = next.selectedIndex;
+      if (selected != null &&
+          selected != _currentIndex &&
+          _pageController != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _animateToIndex(selected);
+        });
+      }
+    });
+
+    final feedState = ref.watch(pixivNovelFeedControllerProvider);
+    final items = feedState.items;
+    if (_pageController == null) {
+      _maybeAttachPagerFromFeed(items);
+    }
+
+    final hasPager = _pageController != null && items.isNotEmpty;
+    final activeContent = hasPager &&
+            _currentIndex != null &&
+            _currentIndex! >= 0 &&
+            _currentIndex! < items.length
+        ? items[_currentIndex!]
+        : widget.initialContent;
+    final activeIndex = _currentIndex;
+    final effectiveNovelId = hasPager && activeIndex != null
+        ? _novelIdForIndex(items, activeIndex)
+        : widget.novelId;
+    final titleAsync = ref.watch(novelDetailProvider(effectiveNovelId));
+    final fallbackTitle =
+        activeContent?.title ?? widget.initialContent?.title ?? '小说详情';
+    final currentTitle = titleAsync.maybeWhen(
       data: (detail) => detail.title,
-      orElse: () => widget.initialContent?.title ?? '小说详情',
+      orElse: () => fallbackTitle,
     );
+
+    final body = hasPager
+        ? _buildPager(feedState, items)
+        : _NovelDetailPage(
+            novelId: widget.novelId,
+            initialContent: widget.initialContent,
+            onRecordHistory: _recordHistory,
+          );
+
+    return WillPopScope(
+      onWillPop: () async {
+        _requestScrollBack();
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            currentTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        body: body,
+      ),
+    );
+  }
+
+  Widget _buildPager(FeedState feedState, List<FaioContent> items) {
+    final controller = _pageController!;
+    final currentIndex = _currentIndex ?? widget.initialIndex ?? 0;
+    final baseCount = feedState.hasMore ? items.length + 1 : items.length;
+    final minCount = math.max(currentIndex + 1, 1);
+    final itemCount = math.max(baseCount, minCount);
+
+    return PageView.builder(
+      controller: controller,
+      onPageChanged: _handlePageChanged,
+      itemCount: math.max(1, itemCount),
+      itemBuilder: (context, index) {
+        if (index >= items.length) {
+          if (feedState.hasMore) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              ref
+                  .read(pixivNovelFeedControllerProvider.notifier)
+                  .ensureIndexLoaded(index);
+            });
+            return const _NovelDetailLoadingPlaceholder();
+          }
+          return const _NovelDetailEndPlaceholder();
+        }
+        final content = items[index];
+        final novelId = parseContentNumericId(content) ?? widget.novelId;
+        return _NovelDetailPage(
+          key: ValueKey(content.id),
+          novelId: novelId,
+          initialContent: content,
+          onRecordHistory: _recordHistory,
+        );
+      },
+    );
+  }
+}
+
+class _NovelDetailPage extends ConsumerWidget {
+  const _NovelDetailPage({
+    super.key,
+    required this.novelId,
+    this.initialContent,
+    required this.onRecordHistory,
+  });
+
+  final int novelId;
+  final FaioContent? initialContent;
+  final void Function(FaioContent content, {bool force}) onRecordHistory;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detailAsync = ref.watch(novelDetailProvider(novelId));
+    final progressAsync =
+        ref.watch(novelReadingProgressProvider(novelId));
     final detail = detailAsync.valueOrNull;
     final historyContent = detail != null
-        ? novelDetailToContent(detail, fallback: widget.initialContent)
-        : widget.initialContent;
+        ? novelDetailToContent(detail, fallback: initialContent)
+        : initialContent;
     if (historyContent != null) {
-      _recordHistory(historyContent, force: detail != null);
+      onRecordHistory(historyContent, force: detail != null);
     }
-    final fallbackDetail = widget.initialContent != null
+    final fallbackDetail = initialContent != null
         ? contentToNovelDetail(
-            widget.initialContent!,
-            novelIdOverride: widget.novelId,
+            initialContent!,
+            novelIdOverride: novelId,
           )
         : null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+    return detailAsync.when(
+      data: (detail) => _NovelDetailContent(
+        detail: detail,
+        initialContent: initialContent,
+        novelId: novelId,
+        progressAsync: progressAsync,
+        favoriteContent: historyContent,
       ),
-      body: detailAsync.when(
-        data: (detail) => _NovelDetailContent(
-          detail: detail,
-          initialContent: widget.initialContent,
-          novelId: widget.novelId,
-          progressAsync: progressAsync,
-          favoriteContent: historyContent,
-        ),
-        loading: () {
-          if (fallbackDetail != null) {
-            return _NovelDetailContent(
-              detail: fallbackDetail,
-              initialContent: widget.initialContent,
-              novelId: widget.novelId,
-              progressAsync: progressAsync,
-              favoriteContent: widget.initialContent,
-            );
-          }
-          return _NovelDetailSkeleton(initialContent: widget.initialContent);
-        },
-        error: (error, stackTrace) => _NovelDetailError(
-          message: error.toString(),
-          onRetry: () => ref.invalidate(novelDetailProvider(widget.novelId)),
+      loading: () {
+        if (fallbackDetail != null) {
+          return _NovelDetailContent(
+            detail: fallbackDetail,
+            initialContent: initialContent,
+            novelId: novelId,
+            progressAsync: progressAsync,
+            favoriteContent: historyContent,
+          );
+        }
+        return _NovelDetailSkeleton(initialContent: initialContent);
+      },
+      error: (error, stackTrace) => _NovelDetailError(
+        message: error.toString(),
+        onRetry: () => ref.invalidate(novelDetailProvider(novelId)),
+      ),
+    );
+  }
+}
+
+class _NovelDetailLoadingPlaceholder extends StatelessWidget {
+  const _NovelDetailLoadingPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+
+class _NovelDetailEndPlaceholder extends StatelessWidget {
+  const _NovelDetailEndPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+        child: Text(
+          '已经是最后一篇小说啦',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
         ),
       ),
     );

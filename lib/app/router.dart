@@ -79,9 +79,17 @@ final appRouterProvider = Provider<GoRouter>(
                       final novelId = novelIdParam != null
                           ? int.tryParse(novelIdParam)
                           : null;
+                      final indexParam = state.uri.queryParameters['index'];
+                      int? initialIndex;
+                      if (indexParam != null) {
+                        initialIndex = int.tryParse(indexParam);
+                      }
                       FaioContent? initialContent;
                       final extra = state.extra;
-                      if (extra is FaioContent) {
+                      if (extra is NovelDetailRouteExtra) {
+                        initialContent = extra.initialContent;
+                        initialIndex = extra.initialIndex ?? initialIndex;
+                      } else if (extra is FaioContent) {
                         initialContent = extra;
                       }
                       if (novelId == null) {
@@ -96,6 +104,7 @@ final appRouterProvider = Provider<GoRouter>(
                         child: NovelDetailScreen(
                           novelId: novelId,
                           initialContent: initialContent,
+                          initialIndex: initialIndex,
                         ),
                         transitionsBuilder: _detailPageTransitionBuilder,
                       );

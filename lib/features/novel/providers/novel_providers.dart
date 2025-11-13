@@ -6,6 +6,57 @@ import '../../../domain/models/novel_reader.dart';
 import '../../../core/providers/shared_preferences_provider.dart';
 import '../data/novel_reading_storage.dart';
 
+class NovelFeedSelectionState {
+  const NovelFeedSelectionState({this.selectedIndex, this.pendingScrollIndex});
+
+  final int? selectedIndex;
+  final int? pendingScrollIndex;
+
+  NovelFeedSelectionState copyWith({
+    int? selectedIndex,
+    int? pendingScrollIndex,
+    bool clearSelection = false,
+    bool clearPendingScroll = false,
+  }) {
+    return NovelFeedSelectionState(
+      selectedIndex: clearSelection
+          ? null
+          : selectedIndex ?? this.selectedIndex,
+      pendingScrollIndex: clearPendingScroll
+          ? null
+          : pendingScrollIndex ?? this.pendingScrollIndex,
+    );
+  }
+}
+
+class NovelFeedSelectionController
+    extends StateNotifier<NovelFeedSelectionState> {
+  NovelFeedSelectionController()
+      : super(const NovelFeedSelectionState());
+
+  void select(int index) {
+    state = state.copyWith(selectedIndex: index);
+  }
+
+  void requestScrollTo(int index) {
+    state = state.copyWith(pendingScrollIndex: index);
+  }
+
+  void clearScrollRequest() {
+    state = state.copyWith(clearPendingScroll: true);
+  }
+
+  void clearSelection() {
+    state = state.copyWith(clearSelection: true);
+  }
+}
+
+final novelFeedSelectionProvider = StateNotifierProvider.autoDispose<
+    NovelFeedSelectionController,
+    NovelFeedSelectionState>((ref) {
+  return NovelFeedSelectionController();
+}, name: 'novelFeedSelectionProvider');
+
 final novelReadingStorageProvider = Provider<NovelReadingStorage>((ref) {
   final prefsFuture = ref.watch(sharedPreferencesProvider);
   return NovelReadingStorage(prefsFuture: prefsFuture);

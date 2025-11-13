@@ -9,7 +9,11 @@ import 'package:skeletonizer/skeletonizer.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
+import 'package:faio/features/novel/presentation/novel_detail_screen.dart'
+    show NovelDetailRouteExtra;
 import 'package:faio/features/novel/presentation/novel_hero.dart';
+import 'package:faio/features/novel/providers/novel_providers.dart'
+    show NovelFeedSelectionState, novelFeedSelectionProvider;
 
 import '../providers/feed_providers.dart';
 import 'illustration_hero.dart';
@@ -495,6 +499,7 @@ class _NovelTab extends ConsumerStatefulWidget {
 
 class _NovelTabState extends ConsumerState<_NovelTab> {
   late final ScrollController _scrollController;
+  final Map<int, GlobalKey> _itemKeys = {};
 
   @override
   void initState() {
@@ -519,6 +524,45 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
     }
   }
 
+  Future<void> _scrollToIndex(int index) async {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    Future<bool> ensureVisible() async {
+      final context = _itemKeys[index]?.currentContext;
+      if (context != null) {
+        await Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeInOut,
+          alignment: 0.1,
+        );
+        return true;
+      }
+      return false;
+    }
+
+    if (await ensureVisible()) {
+      return;
+    }
+
+    final fallbackExtent = 240.0;
+    final targetOffset = index * fallbackExtent;
+    final position = _scrollController.position;
+    final clamped = targetOffset.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    await _scrollController.animateTo(
+      clamped,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInOut,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    await ensureVisible();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<FeedState>(pixivNovelFeedControllerProvider, (previous, next) {
@@ -532,9 +576,24 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
       }
     });
 
+    ref.listen<NovelFeedSelectionState>(novelFeedSelectionProvider,
+        (previous, next) {
+      if (!mounted) return;
+      final targetIndex = next.pendingScrollIndex;
+      if (targetIndex != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _scrollToIndex(targetIndex);
+          final controller = ref.read(novelFeedSelectionProvider.notifier);
+          controller.clearScrollRequest();
+          controller.clearSelection();
+        });
+      }
+    });
+
     final feedState = ref.watch(pixivNovelFeedControllerProvider);
     final notifier = ref.read(pixivNovelFeedControllerProvider.notifier);
     final items = feedState.items;
+    _itemKeys.removeWhere((key, _) => key >= items.length);
 
     if (feedState.isLoadingInitial && items.isEmpty) {
       final size = MediaQuery.of(context).size;
@@ -568,7 +627,12 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
             return _ListLoadMore(provider: pixivNovelFeedControllerProvider);
           }
           final item = items[index];
-          return _NovelListItem(item: item);
+          final key = _itemKeys.putIfAbsent(index, () => GlobalKey());
+          return _NovelListItem(
+            key: key,
+            item: item,
+            index: index,
+          );
         },
       ),
     );
@@ -682,13 +746,14 @@ class _MangaTile extends StatelessWidget {
   }
 }
 
-class _NovelListItem extends StatelessWidget {
-  const _NovelListItem({required this.item});
+class _NovelListItem extends ConsumerWidget {
+  const _NovelListItem({required this.item, required this.index, super.key});
 
   final FaioContent item;
+  final int index;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final previewUrl = item.previewUrl ?? item.sampleUrl;
     final aspectRatio = ((item.previewAspectRatio ?? 1.4).clamp(
@@ -799,6 +864,7 @@ class _NovelListItem extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
+          ref.read(novelFeedSelectionProvider.notifier).select(index);
           final novelId = parseContentNumericId(item);
           if (novelId == null) {
             final messenger = ScaffoldMessenger.maybeOf(context);
@@ -807,7 +873,11 @@ class _NovelListItem extends StatelessWidget {
             );
             return;
           }
-          context.push('/feed/novel/$novelId', extra: item);
+          final extras = NovelDetailRouteExtra(
+            initialContent: item,
+            initialIndex: index,
+          );
+          context.push('/feed/novel/$novelId?index=$index', extra: extras);
         },
         splashColor: theme.colorScheme.primary.withOpacity(0.08),
         child: Padding(
