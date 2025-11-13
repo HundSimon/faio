@@ -186,11 +186,6 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 32),
-                        _ReaderFooter(
-                          palette: palette,
-                          progress: currentProgress,
-                        ),
                       ],
                     ),
                   ),
@@ -256,19 +251,19 @@ class _ReaderFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ratio = progress?.relativeOffset ?? 0;
-    final percent = (ratio * 100).clamp(0, 100).toStringAsFixed(0);
+    final ratio = (progress?.relativeOffset ?? 0).clamp(0.0, 1.0);
+    final percent = (ratio * 100).toStringAsFixed(0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LinearProgressIndicator(
-          value: ratio > 0 ? ratio : null,
+          value: ratio,
           backgroundColor: palette.subtleText.withOpacity(0.2),
           color: palette.accent,
         ),
         const SizedBox(height: 8),
         Text(
-          progress == null ? '开始阅读吧' : '阅读进度：$percent%',
+          '阅读进度：$percent%',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: palette.subtleText),
