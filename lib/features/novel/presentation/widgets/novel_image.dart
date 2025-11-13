@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 const _pixivFallbackHosts = ['i.pixiv.re', 'i.pixiv.nl', 'i.pixiv.cat'];
@@ -55,11 +56,14 @@ class _ResilientNetworkImageState extends State<ResilientNetworkImage> {
   @override
   Widget build(BuildContext context) {
     final currentUrl = widget.urls[_index].toString();
-    return Image.network(
+    final imageProvider = CachedNetworkImageProvider(
       currentUrl,
+      headers: widget.headers,
+    );
+    return Image(
+      image: imageProvider,
       fit: widget.fit,
       alignment: widget.alignment,
-      headers: widget.headers,
       errorBuilder: (context, error, stackTrace) {
         if (_index < widget.urls.length - 1) {
           WidgetsBinding.instance.addPostFrameCallback((_) {

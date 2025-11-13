@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -109,10 +110,12 @@ class _IllustrationGalleryScreenState
                   minScale: 1,
                   maxScale: 4,
                   child: Center(
-                    child: Image.network(
-                      imageUrl.toString(),
+                    child: Image(
+                      image: CachedNetworkImageProvider(
+                        imageUrl.toString(),
+                        headers: _imageHeadersFor(item),
+                      ),
                       fit: BoxFit.contain,
-                      headers: _imageHeadersFor(item),
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) {
                           return child;

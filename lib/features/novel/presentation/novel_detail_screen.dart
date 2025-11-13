@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -835,10 +836,12 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
     final layers = <Widget>[
       Positioned.fill(
         child: widget.lowRes != null
-            ? Image.network(
-                widget.lowRes.toString(),
+            ? Image(
+                image: CachedNetworkImageProvider(
+                  widget.lowRes.toString(),
+                  headers: imageHeadersForUrl(widget.lowRes),
+                ),
                 fit: BoxFit.cover,
-                headers: imageHeadersForUrl(widget.lowRes),
                 errorBuilder: (_, __, ___) => Container(
                   color: widget.fallbackColor,
                 ),
@@ -853,10 +856,12 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
           child: AnimatedOpacity(
             opacity: _highResLoaded ? 1 : 0,
             duration: const Duration(milliseconds: 320),
-            child: Image.network(
-              widget.highRes.toString(),
+            child: Image(
+              image: CachedNetworkImageProvider(
+                widget.highRes.toString(),
+                headers: imageHeadersForUrl(widget.highRes),
+              ),
               fit: BoxFit.cover,
-              headers: imageHeadersForUrl(widget.highRes),
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null && !_highResLoaded) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {

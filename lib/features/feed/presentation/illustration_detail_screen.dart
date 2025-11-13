@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:animations/animations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -544,11 +545,13 @@ class _ProgressiveIllustrationImageState
     final layers = <Widget>[
       Positioned.fill(
         child: widget.lowRes != null
-            ? Image.network(
-                widget.lowRes.toString(),
+            ? Image(
+                image: CachedNetworkImageProvider(
+                  widget.lowRes.toString(),
+                  headers: _imageHeadersFor(widget.content),
+                ),
                 fit: widget.fit,
                 alignment: widget.alignment,
-                headers: _imageHeadersFor(widget.content),
                 errorBuilder: (_, __, ___) => Container(color: backgroundColor),
               )
             : Container(color: backgroundColor),
@@ -561,11 +564,13 @@ class _ProgressiveIllustrationImageState
           child: AnimatedOpacity(
             opacity: _highResLoaded ? 1 : 0,
             duration: const Duration(milliseconds: 320),
-            child: Image.network(
-              widget.highRes.toString(),
+            child: Image(
+              image: CachedNetworkImageProvider(
+                widget.highRes.toString(),
+                headers: _imageHeadersFor(widget.content),
+              ),
               fit: widget.fit,
               alignment: widget.alignment,
-              headers: _imageHeadersFor(widget.content),
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null && !_highResLoaded) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {

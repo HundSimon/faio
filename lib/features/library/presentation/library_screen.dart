@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -468,15 +469,18 @@ class _ContentThumbnailState extends State<_ContentThumbnail> {
     final headers = _imageHeadersFor(widget.content, url: preview);
     final currentUrl = urls[_index];
 
+    final imageProvider = CachedNetworkImageProvider(
+      currentUrl.toString(),
+      headers: headers,
+    );
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
         width: 72,
         height: 72,
-        child: Image.network(
-          currentUrl.toString(),
+        child: Image(
+          image: imageProvider,
           fit: BoxFit.cover,
-          headers: headers,
           errorBuilder: (context, error, stackTrace) {
             if (_index < urls.length - 1) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -615,10 +619,13 @@ class _PreviewImageState extends State<_PreviewImage> {
     final headers = _imageHeadersFor(widget.content, url: widget.url);
     final theme = Theme.of(context);
 
-    return Image.network(
+    final imageProvider = CachedNetworkImageProvider(
       urls[_index].toString(),
-      fit: BoxFit.cover,
       headers: headers,
+    );
+    return Image(
+      image: imageProvider,
+      fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) {
         if (_index < urls.length - 1) {
           WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -82,11 +83,14 @@ class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
   @override
   Widget build(BuildContext context) {
     final currentUrl = widget.urls[_index].toString();
-    return Image.network(
+    final imageProvider = CachedNetworkImageProvider(
       currentUrl,
+      headers: widget.headers,
+    );
+    return Image(
+      image: imageProvider,
       fit: widget.fit,
       alignment: widget.alignment,
-      headers: widget.headers,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
           return child;
