@@ -3,7 +3,10 @@ import '../../furrynovel/models/furry_novel_models.dart';
 import '../../pixiv/models/pixiv_models.dart';
 
 class NovelMapper {
-  static NovelDetail? fromFurryNovel(FurryNovel novel) {
+  static NovelDetail? fromFurryNovel(
+    FurryNovel novel, {
+    int? likeCountOverride,
+  }) {
     final body = (novel.content ?? novel.description).trim();
     final description = novel.description.trim();
     final resolvedBody = body.isNotEmpty ? body : description;
@@ -47,7 +50,7 @@ class NovelMapper {
       updatedAt: novel.createDate,
       images: images,
       sourceLinks: links,
-      likeCount: novel.pixivLikeCount,
+      likeCount: likeCountOverride ?? novel.pixivLikeCount,
       readCount: novel.pixivReadCount,
     );
   }

@@ -17,6 +17,7 @@ class PixivRepositoryImpl implements PixivRepository {
 
   final PixivService _service;
   final FurryNovelService _furryNovelService;
+  final Map<int, int> _novelLikeCountCache = {};
 
   @override
   Future<ContentPageResult> fetchIllustrations({
@@ -74,6 +75,10 @@ class PixivRepositoryImpl implements PixivRepository {
       limit: limit,
     );
 
+    for (final novel in result.items) {
+      _novelLikeCountCache[novel.id] = novel.pixivLikeCount;
+    }
+
     final items = result.items
         .map(ContentMapper.fromFurryNovel)
         .whereType<FaioContent>()
@@ -101,7 +106,13 @@ class PixivRepositoryImpl implements PixivRepository {
   Future<NovelDetail?> fetchNovelDetail(int novelId) async {
     final furryNovel = await _furryNovelService.fetchNovel(novelId);
     if (furryNovel != null) {
-      return NovelMapper.fromFurryNovel(furryNovel);
+      final cachedLikeCount =
+          _novelLikeCountCache[furryNovel.id] ?? furryNovel.pixivLikeCount;
+      _novelLikeCountCache[furryNovel.id] = cachedLikeCount;
+      return NovelMapper.fromFurryNovel(
+        furryNovel,
+        likeCountOverride: cachedLikeCount,
+      );
     }
 
     final pixivNovel = await _service.fetchNovelDetail(novelId);
