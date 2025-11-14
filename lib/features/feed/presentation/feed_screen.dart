@@ -9,6 +9,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
+import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
 import 'package:faio/features/novel/presentation/novel_detail_screen.dart'
     show NovelDetailRouteExtra;
@@ -19,48 +20,6 @@ import 'package:faio/features/novel/providers/novel_providers.dart'
 import '../providers/feed_providers.dart';
 import 'illustration_hero.dart';
 import 'illustration_detail_screen.dart' show IllustrationDetailRouteArgs;
-
-const _pixivFallbackHosts = ['i.pixiv.cat', 'i.pixiv.re', 'i.pixiv.nl'];
-
-Map<String, String>? _imageHeadersFor(FaioContent item, {Uri? url}) {
-  final resolvedUrl =
-      url ?? item.previewUrl ?? item.sampleUrl ?? item.originalUrl;
-  final host = resolvedUrl?.host.toLowerCase();
-  final source = item.source.toLowerCase();
-
-  if (host != null && host.endsWith('pximg.net')) {
-    return const {
-      'Referer': 'https://www.pixiv.net/',
-      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
-    };
-  }
-
-  if (source.startsWith('pixiv')) {
-    return const {
-      'Referer': 'https://app-api.pixiv.net/',
-      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
-    };
-  }
-
-  return null;
-}
-
-List<Uri> _imageUrlCandidates(Uri url) {
-  final candidates = <Uri>[url];
-  final host = url.host.toLowerCase();
-  if (host == 'i.pximg.net') {
-    for (final fallbackHost in _pixivFallbackHosts) {
-      final candidate = url.replace(host: fallbackHost);
-      final alreadyExists = candidates.any(
-        (existing) => existing.toString() == candidate.toString(),
-      );
-      if (!alreadyExists) {
-        candidates.add(candidate);
-      }
-    }
-  }
-  return candidates;
-}
 
 class _ResilientNetworkImage extends StatefulWidget {
   const _ResilientNetworkImage({
@@ -1116,8 +1075,8 @@ class _NovelListItem extends ConsumerWidget {
           ),
         );
       } else {
-        final urls = _imageUrlCandidates(previewUrl);
-        final headers = _imageHeadersFor(item, url: previewUrl);
+        final urls = pixivImageUrlCandidates(previewUrl);
+        final headers = pixivImageHeaders(content: item, url: previewUrl);
         child = ClipRRect(
           borderRadius: borderRadius,
           child: _ResilientNetworkImage(
@@ -1487,8 +1446,8 @@ class _ContentTile extends StatelessWidget {
           onTap: onTap,
           child: preview != null
               ? _ResilientNetworkImage(
-                  urls: _imageUrlCandidates(preview),
-                  headers: _imageHeadersFor(item, url: preview),
+                  urls: pixivImageUrlCandidates(preview),
+                  headers: pixivImageHeaders(content: item, url: preview),
                   fit: BoxFit.cover,
                   placeholder: loadingPlaceholder,
                   errorBuilder: (_, __, ___) =>

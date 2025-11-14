@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:faio/domain/utils/pixiv_image_utils.dart';
+
 import '../../../../domain/models/novel_detail.dart';
 import '../../providers/novel_providers.dart';
 import 'novel_image.dart';
@@ -180,8 +182,8 @@ class _SeriesCover extends StatelessWidget {
         width: 56,
         height: 80,
         child: ResilientNetworkImage(
-          urls: imageUrlCandidates(coverUrl!),
-          headers: imageHeadersForUrl(coverUrl),
+          urls: pixivImageUrlCandidates(coverUrl!),
+          headers: pixivImageHeaders(url: coverUrl),
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => placeholder,
         ),

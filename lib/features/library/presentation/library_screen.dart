@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
+import 'package:faio/domain/utils/pixiv_image_utils.dart';
 
 import '../../novel/presentation/widgets/novel_series_sheet.dart';
 import '../domain/library_entries.dart';
@@ -465,8 +466,8 @@ class _ContentThumbnailState extends State<_ContentThumbnail> {
     if (preview == null) {
       return placeholder;
     }
-    final urls = _imageUrlCandidates(preview);
-    final headers = _imageHeadersFor(widget.content, url: preview);
+    final urls = pixivImageUrlCandidates(preview);
+    final headers = pixivImageHeaders(content: widget.content, url: preview);
     final currentUrl = urls[_index];
 
     final imageProvider = CachedNetworkImageProvider(
@@ -615,8 +616,8 @@ class _PreviewImageState extends State<_PreviewImage> {
 
   @override
   Widget build(BuildContext context) {
-    final urls = _imageUrlCandidates(widget.url);
-    final headers = _imageHeadersFor(widget.content, url: widget.url);
+    final urls = pixivImageUrlCandidates(widget.url);
+    final headers = pixivImageHeaders(content: widget.content, url: widget.url);
     final theme = Theme.of(context);
 
     final imageProvider = CachedNetworkImageProvider(
@@ -708,47 +709,6 @@ String _formatDate(DateTime dateTime) {
   String two(int value) => value.toString().padLeft(2, '0');
   return '${local.year}-${two(local.month)}-${two(local.day)} '
       '${two(local.hour)}:${two(local.minute)}';
-}
-
-const _pixivFallbackHosts = ['i.pixiv.cat', 'i.pixiv.re', 'i.pixiv.nl'];
-
-Map<String, String>? _imageHeadersFor(FaioContent content, {Uri? url}) {
-  final resolved = url ?? content.previewUrl ?? content.sampleUrl;
-  final host = resolved?.host.toLowerCase();
-  final source = content.source.toLowerCase();
-
-  if (host != null && host.endsWith('pximg.net')) {
-    return const {
-      'Referer': 'https://www.pixiv.net/',
-      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
-    };
-  }
-
-  if (source.startsWith('pixiv')) {
-    return const {
-      'Referer': 'https://app-api.pixiv.net/',
-      'User-Agent': 'PixivAndroidApp/5.0.234 (Android 11; Pixel 5)',
-    };
-  }
-
-  return null;
-}
-
-List<Uri> _imageUrlCandidates(Uri url) {
-  final candidates = <Uri>[url];
-  final host = url.host.toLowerCase();
-  if (host == 'i.pximg.net') {
-    for (final fallback in _pixivFallbackHosts) {
-      final replacement = url.replace(host: fallback);
-      final exists = candidates.any(
-        (existing) => existing.toString() == replacement.toString(),
-      );
-      if (!exists) {
-        candidates.add(replacement);
-      }
-    }
-  }
-  return candidates;
 }
 
 extension FirstOrNullExtension<T> on List<T> {

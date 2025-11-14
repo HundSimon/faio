@@ -11,6 +11,7 @@ import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
 import 'package:faio/domain/utils/content_id.dart';
+import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
 import 'package:faio/features/feed/providers/feed_providers.dart';
@@ -1403,7 +1404,7 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
             ? Image(
                 image: CachedNetworkImageProvider(
                   widget.lowRes.toString(),
-                  headers: imageHeadersForUrl(widget.lowRes),
+                  headers: pixivImageHeaders(url: widget.lowRes),
                 ),
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
@@ -1423,7 +1424,7 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
             child: Image(
               image: CachedNetworkImageProvider(
                 widget.highRes.toString(),
-                headers: imageHeadersForUrl(widget.highRes),
+                headers: pixivImageHeaders(url: widget.highRes),
               ),
               fit: BoxFit.cover,
               loadingBuilder: (context, child, loadingProgress) {
