@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -84,7 +85,6 @@ class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
       },
     );
   }
-
 }
 
 Future<void> _showAllTags(BuildContext context, List<String> tags) async {
@@ -188,6 +188,8 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
   late final ScrollController _e621ScrollController;
   var _tabsVisible = true;
   var _suppressVisibilityUpdates = false;
+  final Map<int, GlobalKey> _pixivItemKeys = {};
+  final Map<int, GlobalKey> _e621ItemKeys = {};
 
   @override
   void initState() {
@@ -216,8 +218,9 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     if (position.pixels >= position.maxScrollExtent - 200) {
       ref
           .read(
-            illustrationFeedControllerProvider(IllustrationSource.pixiv)
-                .notifier,
+            illustrationFeedControllerProvider(
+              IllustrationSource.pixiv,
+            ).notifier,
           )
           .loadMore();
     }
@@ -232,17 +235,15 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     if (position.pixels >= position.maxScrollExtent - 200) {
       ref
           .read(
-            illustrationFeedControllerProvider(IllustrationSource.e621)
-                .notifier,
+            illustrationFeedControllerProvider(
+              IllustrationSource.e621,
+            ).notifier,
           )
           .loadMore();
     }
   }
 
-  Future<void> _scrollToIndex(
-    IllustrationSource source,
-    int index,
-  ) async {
+  Future<void> _scrollToIndex(IllustrationSource source, int index) async {
     final provider = illustrationFeedControllerProvider(source);
     final items = ref.read(provider).items;
     if (index < 0 || index >= items.length) {
@@ -257,20 +258,43 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
       await Future<void>.delayed(const Duration(milliseconds: 220));
     }
 
-    final controller =
-        source == IllustrationSource.pixiv ? _pixivScrollController : _e621ScrollController;
+    final controller = source == IllustrationSource.pixiv
+        ? _pixivScrollController
+        : _e621ScrollController;
+    final itemKeys = source == IllustrationSource.pixiv
+        ? _pixivItemKeys
+        : _e621ItemKeys;
     if (!controller.hasClients) {
       return;
     }
+    Future<bool> ensureVisible() async {
+      final context = itemKeys[index]?.currentContext;
+      if (context == null) {
+        return false;
+      }
+      await Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
+      return true;
+    }
+
     _setTabsVisible(true);
     _suppressVisibilityUpdates = true;
-    final offset = _calculateScrollOffset(controller, index);
     try {
+      if (await ensureVisible()) {
+        return;
+      }
+      final offset = _calculateScrollOffset(controller, index);
       await controller.animateTo(
         offset,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      await ensureVisible();
     } finally {
       _suppressVisibilityUpdates = false;
     }
@@ -319,10 +343,12 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
       }
     });
 
-    final pixivProvider =
-        illustrationFeedControllerProvider(IllustrationSource.pixiv);
-    final e621Provider =
-        illustrationFeedControllerProvider(IllustrationSource.e621);
+    final pixivProvider = illustrationFeedControllerProvider(
+      IllustrationSource.pixiv,
+    );
+    final e621Provider = illustrationFeedControllerProvider(
+      IllustrationSource.e621,
+    );
     final pixivState = ref.watch(pixivProvider);
     final e621State = ref.watch(e621Provider);
 
@@ -442,7 +468,8 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
 
   Widget _buildSourceGrid(
     BuildContext context, {
-    required AutoDisposeStateNotifierProvider<FeedController, FeedState> provider,
+    required AutoDisposeStateNotifierProvider<FeedController, FeedState>
+    provider,
     required ScrollController controller,
     required FeedState state,
     required IllustrationSource source,
@@ -456,6 +483,12 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
         ? _estimateIllustrationSkeletonCount(context)
         : 0;
     final showLoadMore = !shouldShowSkeleton && state.hasMore;
+    final itemKeys = source == IllustrationSource.pixiv
+        ? _pixivItemKeys
+        : _e621ItemKeys;
+    if (!shouldShowSkeleton) {
+      itemKeys.removeWhere((key, _) => key >= state.items.length);
+    }
 
     if (!shouldShowSkeleton && state.items.isEmpty) {
       final theme = Theme.of(context);
@@ -472,15 +505,9 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      emptyIcon,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    Icon(emptyIcon, color: theme.colorScheme.onSurfaceVariant),
                     const SizedBox(height: 12),
-                    Text(
-                      emptyTitle,
-                      style: theme.textTheme.titleMedium,
-                    ),
+                    Text(emptyTitle, style: theme.textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text(
                       emptySubtitle,
@@ -507,18 +534,16 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
       child: Skeletonizer(
         effect: kFaioSkeletonEffect,
         enabled: shouldShowSkeleton,
-        child: GridView.builder(
+        child: MasonryGridView.count(
           controller: controller,
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(
             horizontal: _horizontalPadding,
             vertical: _verticalPadding,
           ),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _crossAxisCount,
-            mainAxisSpacing: _mainAxisSpacing,
-            crossAxisSpacing: _crossAxisSpacing,
-            childAspectRatio: 1,
-          ),
+          crossAxisSpacing: _crossAxisSpacing,
+          mainAxisSpacing: _mainAxisSpacing,
+          crossAxisCount: _crossAxisCount,
           itemCount: itemCount,
           itemBuilder: (context, index) {
             if (shouldShowSkeleton) {
@@ -529,6 +554,7 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
             }
             final item = state.items[index];
             return _IllustrationTile(
+              key: itemKeys.putIfAbsent(index, () => GlobalKey()),
               item: item,
               index: index,
               source: source,
@@ -561,8 +587,7 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     }
     final position = controller.position;
     final direction = position.userScrollDirection;
-    final isNearTop = position.pixels <=
-        (position.minScrollExtent + 8.0);
+    final isNearTop = position.pixels <= (position.minScrollExtent + 8.0);
     if (direction == ScrollDirection.reverse && !isNearTop) {
       _setTabsVisible(false);
     } else if (direction == ScrollDirection.forward || isNearTop) {
@@ -778,8 +803,10 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
       }
     });
 
-    ref.listen<NovelFeedSelectionState>(novelFeedSelectionProvider,
-        (previous, next) {
+    ref.listen<NovelFeedSelectionState>(novelFeedSelectionProvider, (
+      previous,
+      next,
+    ) {
       if (!mounted) return;
       final targetIndex = next.pendingScrollIndex;
       if (targetIndex != null) {
@@ -800,8 +827,10 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
     if (feedState.isLoadingInitial && items.isEmpty) {
       final size = MediaQuery.of(context).size;
       const estimatedItemHeight = 180.0;
-      final skeletonCount =
-          math.max(6, (size.height / estimatedItemHeight).ceil() + 2);
+      final skeletonCount = math.max(
+        6,
+        (size.height / estimatedItemHeight).ceil() + 2,
+      );
       return RefreshIndicator(
         onRefresh: notifier.refresh,
         child: Skeletonizer(
@@ -830,11 +859,7 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
           }
           final item = items[index];
           final key = _itemKeys.putIfAbsent(index, () => GlobalKey());
-          return _NovelListItem(
-            key: key,
-            item: item,
-            index: index,
-          );
+          return _NovelListItem(key: key, item: item, index: index);
         },
       ),
     );
@@ -851,10 +876,13 @@ class _LoadMoreTile extends ConsumerWidget {
     final isLoadingMore = ref.watch(
       provider.select((state) => state.isLoadingMore),
     );
-    return Center(
-      child: isLoadingMore
-          ? const CircularProgressIndicator()
-          : const SizedBox.shrink(),
+    return SizedBox(
+      height: 48,
+      child: Center(
+        child: isLoadingMore
+            ? const CircularProgressIndicator()
+            : const SizedBox.shrink(),
+      ),
     );
   }
 }
@@ -903,6 +931,7 @@ class _IllustrationTile extends ConsumerWidget {
     required this.item,
     required this.index,
     required this.source,
+    super.key,
   });
 
   final FaioContent item;
@@ -911,18 +940,25 @@ class _IllustrationTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return _ContentTile(
-      item: item,
-      onTap: () {
-        ref.read(feedSelectionProvider.notifier).select(source, index);
-        context.push(
-          '/feed/detail',
-          extra: IllustrationDetailRouteArgs(
-            source: source,
-            initialIndex: index,
-          ),
-        );
-      },
+    final aspectRatio = ((item.previewAspectRatio ?? 1).clamp(
+      0.5,
+      1.8,
+    )).toDouble();
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: _ContentTile(
+        item: item,
+        onTap: () {
+          ref.read(feedSelectionProvider.notifier).select(source, index);
+          context.push(
+            '/feed/detail',
+            extra: IllustrationDetailRouteArgs(
+              source: source,
+              initialIndex: index,
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -934,19 +970,19 @@ class _IllustrationSkeletonTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.surfaceVariant;
     return Skeleton.leaf(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(color: color),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(color: color),
+        ),
       ),
     );
   }
 }
 
 class _SourceTabLabel extends StatelessWidget {
-  const _SourceTabLabel({
-    required this.label,
-    required this.color,
-  });
+  const _SourceTabLabel({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -961,10 +997,7 @@ class _SourceTabLabel extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
         Text(
@@ -1117,9 +1150,7 @@ class _NovelListItem extends ConsumerWidget {
           final novelId = parseContentNumericId(item);
           if (novelId == null) {
             final messenger = ScaffoldMessenger.maybeOf(context);
-            messenger?.showSnackBar(
-              const SnackBar(content: Text('无法解析小说 ID')),
-            );
+            messenger?.showSnackBar(const SnackBar(content: Text('无法解析小说 ID')));
             return;
           }
           final extras = NovelDetailRouteExtra(
@@ -1343,11 +1374,7 @@ class _NovelListSkeletonItem extends StatelessWidget {
     const coverWidth = 128.0;
     const coverHeight = 180.0;
 
-    Widget line({
-      double height = 14,
-      double? width,
-      double radius = 6,
-    }) {
+    Widget line({double height = 14, double? width, double radius = 6}) {
       return Skeleton.leaf(
         child: Container(
           height: height,
@@ -1398,9 +1425,7 @@ class _NovelListSkeletonItem extends StatelessWidget {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Expanded(
-                        child: line(height: 20, radius: 999),
-                      ),
+                      Expanded(child: line(height: 20, radius: 999)),
                       const SizedBox(width: 12),
                       line(height: 20, width: 52, radius: 999),
                     ],
