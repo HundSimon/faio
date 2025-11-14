@@ -18,8 +18,13 @@ Map<String, String>? _imageHeadersFor(FaioContent content) {
 }
 
 class IllustrationGalleryScreen extends ConsumerStatefulWidget {
-  const IllustrationGalleryScreen({required this.initialIndex, super.key});
+  const IllustrationGalleryScreen({
+    required this.source,
+    required this.initialIndex,
+    super.key,
+  });
 
+  final IllustrationSource source;
   final int initialIndex;
 
   @override
@@ -41,9 +46,13 @@ class _IllustrationGalleryScreenState
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(feedSelectionProvider.notifier).select(_currentIndex);
       ref
-          .read(feedControllerProvider.notifier)
+          .read(feedSelectionProvider.notifier)
+          .select(widget.source, _currentIndex);
+      ref
+          .read(
+            illustrationFeedControllerProvider(widget.source).notifier,
+          )
           .ensureIndexLoaded(_currentIndex);
     });
   }
@@ -57,17 +66,20 @@ class _IllustrationGalleryScreenState
   void _onPageChanged(int index) {
     _currentIndex = index;
     final selection = ref.read(feedSelectionProvider.notifier);
-    selection.select(index);
+    selection.select(widget.source, index);
     _showOriginalIndexes.removeWhere((entry) => entry != index);
 
-    final controller = ref.read(feedControllerProvider.notifier);
+    final controller = ref.read(
+      illustrationFeedControllerProvider(widget.source).notifier,
+    );
     controller.ensureIndexLoaded(index);
     controller.ensureIndexLoaded(index + 1);
   }
 
   @override
   Widget build(BuildContext context) {
-    final feedState = ref.watch(feedControllerProvider);
+    final feedState =
+        ref.watch(illustrationFeedControllerProvider(widget.source));
     final items = feedState.items;
     final itemCount = feedState.hasMore ? items.length + 1 : items.length;
 
@@ -88,7 +100,10 @@ class _IllustrationGalleryScreenState
                 if (index >= items.length) {
                   if (feedState.hasMore && !feedState.isLoadingMore) {
                     ref
-                        .read(feedControllerProvider.notifier)
+                        .read(
+                          illustrationFeedControllerProvider(widget.source)
+                              .notifier,
+                        )
                         .ensureIndexLoaded(index);
                   }
                   return const Center(

@@ -2,10 +2,13 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/e621/e621_providers.dart';
 import '../../../data/pixiv/pixiv_providers.dart';
-import '../../../data/repositories/content_repository_impl.dart';
+import '../../../data/repositories/mappers/content_mapper.dart';
 import '../../../domain/models/content_item.dart';
 import '../../../domain/models/content_page.dart';
+
+enum IllustrationSource { pixiv, e621 }
 
 const _pageSize = 30;
 
@@ -156,24 +159,37 @@ class FeedController extends StateNotifier<FeedState> {
   }
 }
 
-final feedControllerProvider =
-    StateNotifierProvider.autoDispose<FeedController, FeedState>((ref) {
-      final repository = ref.watch(contentRepositoryProvider);
-      return FeedController(
-        fetchPage: (page, limit) async {
-          final items = await repository.fetchFeedPage(
-            page: page,
-            limit: limit,
+final illustrationFeedControllerProvider =
+    StateNotifierProvider.autoDispose
+        .family<FeedController, FeedState, IllustrationSource>((ref, source) {
+      switch (source) {
+        case IllustrationSource.pixiv:
+          final repository = ref.watch(pixivRepositoryProvider);
+          return FeedController(
+            fetchPage: (page, limit) =>
+                repository.fetchIllustrations(page: page, limit: limit),
+            filter: (item) => item.type == ContentType.illustration,
           );
-          return ContentPageResult(
-            items: items,
-            page: page,
-            hasMore: items.length >= limit,
+        case IllustrationSource.e621:
+          final service = ref.watch(e621ServiceProvider);
+          return FeedController(
+            fetchPage: (page, limit) async {
+              final posts = await service.fetchPosts(page: page, limit: limit);
+              final items = posts
+                  .map(ContentMapper.fromE621)
+                  .whereType<FaioContent>()
+                  .where((item) => item.type == ContentType.illustration)
+                  .toList();
+              final hasMore = posts.length >= limit;
+              return ContentPageResult(
+                items: items,
+                page: page,
+                hasMore: hasMore,
+              );
+            },
           );
-        },
-        filter: (item) => item.type == ContentType.illustration,
-      );
-    }, name: 'feedControllerProvider');
+      }
+    }, name: 'illustrationFeedControllerProvider');
 
 final pixivMangaFeedControllerProvider =
     StateNotifierProvider.autoDispose<FeedController, FeedState>((ref) {
@@ -204,21 +220,36 @@ final feedSelectionProvider =
     }, name: 'feedSelectionProvider');
 
 class FeedSelectionState {
-  const FeedSelectionState({this.selectedIndex, this.pendingScrollIndex});
+  const FeedSelectionState({
+    this.selectedSource,
+    this.selectedIndex,
+    this.pendingScrollSource,
+    this.pendingScrollIndex,
+  });
 
+  final IllustrationSource? selectedSource;
   final int? selectedIndex;
+  final IllustrationSource? pendingScrollSource;
   final int? pendingScrollIndex;
 
   FeedSelectionState copyWith({
+    IllustrationSource? selectedSource,
     int? selectedIndex,
-    bool clearPendingScroll = false,
+    IllustrationSource? pendingScrollSource,
     int? pendingScrollIndex,
+    bool clearPendingScroll = false,
     bool clearSelection = false,
   }) {
     return FeedSelectionState(
+      selectedSource: clearSelection
+          ? null
+          : selectedSource ?? this.selectedSource,
       selectedIndex: clearSelection
           ? null
           : selectedIndex ?? this.selectedIndex,
+      pendingScrollSource: clearPendingScroll
+          ? null
+          : pendingScrollSource ?? this.pendingScrollSource,
       pendingScrollIndex: clearPendingScroll
           ? null
           : pendingScrollIndex ?? this.pendingScrollIndex,
@@ -229,12 +260,15 @@ class FeedSelectionState {
 class FeedSelectionController extends StateNotifier<FeedSelectionState> {
   FeedSelectionController() : super(const FeedSelectionState());
 
-  void select(int index) {
-    state = state.copyWith(selectedIndex: index);
+  void select(IllustrationSource source, int index) {
+    state = state.copyWith(selectedSource: source, selectedIndex: index);
   }
 
-  void requestScrollTo(int index) {
-    state = state.copyWith(pendingScrollIndex: index);
+  void requestScrollTo(IllustrationSource source, int index) {
+    state = state.copyWith(
+      pendingScrollSource: source,
+      pendingScrollIndex: index,
+    );
   }
 
   void clearScrollRequest() {

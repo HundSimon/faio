@@ -43,9 +43,24 @@ String _formatDateTime(DateTime? dateTime) {
       '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }
 
-class IllustrationDetailScreen extends ConsumerStatefulWidget {
-  const IllustrationDetailScreen({required this.initialIndex, super.key});
+class IllustrationDetailRouteArgs {
+  const IllustrationDetailRouteArgs({
+    required this.source,
+    required this.initialIndex,
+  });
 
+  final IllustrationSource source;
+  final int initialIndex;
+}
+
+class IllustrationDetailScreen extends ConsumerStatefulWidget {
+  const IllustrationDetailScreen({
+    required this.source,
+    required this.initialIndex,
+    super.key,
+  });
+
+  final IllustrationSource source;
   final int initialIndex;
 
   @override
@@ -67,9 +82,13 @@ class _IllustrationDetailScreenState
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(feedSelectionProvider.notifier).select(_currentIndex);
       ref
-          .read(feedControllerProvider.notifier)
+          .read(feedSelectionProvider.notifier)
+          .select(widget.source, _currentIndex);
+      ref
+          .read(
+            illustrationFeedControllerProvider(widget.source).notifier,
+          )
           .ensureIndexLoaded(_currentIndex);
     });
   }
@@ -97,8 +116,10 @@ class _IllustrationDetailScreenState
       _lastRecordedId = null;
     });
     final selection = ref.read(feedSelectionProvider.notifier);
-    selection.select(index);
-    final controller = ref.read(feedControllerProvider.notifier);
+    selection.select(widget.source, index);
+    final controller = ref.read(
+      illustrationFeedControllerProvider(widget.source).notifier,
+    );
     controller.ensureIndexLoaded(index + 1);
   }
 
@@ -124,15 +145,21 @@ class _IllustrationDetailScreenState
 
   void _requestScrollBack() {
     if (!mounted) return;
-    ref.read(feedSelectionProvider.notifier).requestScrollTo(_currentIndex);
+    ref
+        .read(feedSelectionProvider.notifier)
+        .requestScrollTo(widget.source, _currentIndex);
   }
 
   @override
   Widget build(BuildContext context) {
-    final feedState = ref.watch(feedControllerProvider);
+    final feedState =
+        ref.watch(illustrationFeedControllerProvider(widget.source));
 
     ref.listen<FeedSelectionState>(feedSelectionProvider, (prev, next) {
       if (!mounted) return;
+      if (next.selectedSource != widget.source) {
+        return;
+      }
       final selected = next.selectedIndex;
       if (selected != null && selected != _currentIndex) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -206,7 +233,10 @@ class _IllustrationDetailScreenState
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!mounted) return;
                   ref
-                      .read(feedControllerProvider.notifier)
+                      .read(
+                        illustrationFeedControllerProvider(widget.source)
+                            .notifier,
+                      )
                       .ensureIndexLoaded(index);
                 });
                 return const _DetailLoadingPlaceholder();

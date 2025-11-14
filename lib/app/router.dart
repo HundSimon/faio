@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../domain/models/content_item.dart';
 import '../features/feed/presentation/feed_screen.dart';
 import '../features/feed/presentation/illustration_detail_screen.dart';
+import '../features/feed/providers/feed_providers.dart' show IllustrationSource;
 import '../features/library/presentation/library_screen.dart';
 import '../features/novel/presentation/novel_detail_screen.dart';
 import '../features/novel/presentation/novel_reader_screen.dart';
@@ -21,6 +22,17 @@ abstract final class AppRoute {
   static const search = '/search';
   static const library = '/library';
   static const settings = '/settings';
+}
+
+IllustrationSource? _illustrationSourceFromParam(String? value) {
+  switch (value?.toLowerCase()) {
+    case 'pixiv':
+      return IllustrationSource.pixiv;
+    case 'e621':
+      return IllustrationSource.e621;
+    default:
+      return null;
+  }
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -46,18 +58,25 @@ final appRouterProvider = Provider<GoRouter>(
                     path: 'detail',
                     name: AppRoute.feedDetail,
                     pageBuilder: (context, state) {
-                      int? index;
+                      IllustrationDetailRouteArgs? args;
                       final extra = state.extra;
-                      if (extra is int) {
-                        index = extra;
+                      if (extra is IllustrationDetailRouteArgs) {
+                        args = extra;
                       } else {
                         final indexParam = state.uri.queryParameters['index'];
-                        if (indexParam != null) {
-                          index = int.tryParse(indexParam);
+                        final sourceParam = state.uri.queryParameters['source'];
+                        final index =
+                            indexParam != null ? int.tryParse(indexParam) : null;
+                        final source = _illustrationSourceFromParam(sourceParam);
+                        if (index != null && source != null) {
+                          args = IllustrationDetailRouteArgs(
+                            source: source,
+                            initialIndex: index,
+                          );
                         }
                       }
 
-                      if (index == null) {
+                      if (args == null) {
                         return CustomTransitionPage<void>(
                           key: state.pageKey,
                           child: const _RouteErrorScreen(),
@@ -66,7 +85,10 @@ final appRouterProvider = Provider<GoRouter>(
                       }
                       return CustomTransitionPage<void>(
                         key: state.pageKey,
-                        child: IllustrationDetailScreen(initialIndex: index),
+                        child: IllustrationDetailScreen(
+                          source: args.source,
+                          initialIndex: args.initialIndex,
+                        ),
                         transitionsBuilder: _detailPageTransitionBuilder,
                       );
                     },
