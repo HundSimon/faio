@@ -65,11 +65,17 @@ class NovelReadingProgress extends Equatable {
     required this.novelId,
     required this.relativeOffset,
     required this.updatedAt,
+    this.absoluteOffset,
+    this.viewportExtent,
+    this.contentExtent,
   });
 
   final int novelId;
   final double relativeOffset;
   final DateTime updatedAt;
+  final double? absoluteOffset;
+  final double? viewportExtent;
+  final double? contentExtent;
 
   bool get isCompleted => relativeOffset >= 0.98;
 
@@ -78,6 +84,9 @@ class NovelReadingProgress extends Equatable {
       'novelId': novelId,
       'relativeOffset': relativeOffset,
       'updatedAt': updatedAt.toIso8601String(),
+      'absoluteOffset': absoluteOffset,
+      'viewportExtent': viewportExtent,
+      'contentExtent': contentExtent,
     };
   }
 
@@ -99,20 +108,36 @@ class NovelReadingProgress extends Equatable {
       novelId: novelId,
       relativeOffset: (json['relativeOffset'] as num?)?.toDouble() ?? 0,
       updatedAt: updatedAt,
+      absoluteOffset: (json['absoluteOffset'] as num?)?.toDouble(),
+      viewportExtent: (json['viewportExtent'] as num?)?.toDouble(),
+      contentExtent: (json['contentExtent'] as num?)?.toDouble(),
     );
   }
 
   @override
-  List<Object?> get props => [novelId, relativeOffset, updatedAt];
+  List<Object?> get props => [
+        novelId,
+        relativeOffset,
+        updatedAt,
+        absoluteOffset,
+        viewportExtent,
+        contentExtent,
+      ];
 
   NovelReadingProgress copyWith({
     double? relativeOffset,
     DateTime? updatedAt,
+    double? absoluteOffset,
+    double? viewportExtent,
+    double? contentExtent,
   }) {
     return NovelReadingProgress(
       novelId: novelId,
       relativeOffset: relativeOffset ?? this.relativeOffset,
       updatedAt: updatedAt ?? this.updatedAt,
+      absoluteOffset: absoluteOffset ?? this.absoluteOffset,
+      viewportExtent: viewportExtent ?? this.viewportExtent,
+      contentExtent: contentExtent ?? this.contentExtent,
     );
   }
 }
