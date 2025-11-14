@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 
@@ -119,6 +120,7 @@ class _IllustrationGalleryScreenState
                       image: CachedNetworkImageProvider(
                         imageUrl.toString(),
                         headers: pixivImageHeaders(content: item),
+                        cacheManager: pixivImageCacheManagerForUrl(imageUrl),
                       ),
                       fit: BoxFit.contain,
                       loadingBuilder: (context, child, loadingProgress) {

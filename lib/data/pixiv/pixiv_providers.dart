@@ -8,6 +8,7 @@ import '../repositories/pixiv_repository_impl.dart';
 import 'pixiv_app_version.dart';
 import 'pixiv_auth.dart';
 import 'pixiv_auth_flow.dart';
+import 'pixiv_dns_resolver.dart';
 import 'pixiv_fallback_service.dart';
 import 'pixiv_http_service.dart';
 import 'pixiv_mock_service.dart';
@@ -25,6 +26,7 @@ final pixivAppVersionProvider =
 
 final pixivHttpClientProvider = Provider<RhttpClient>((ref) {
   final version = ref.watch(pixivAppVersionProvider);
+  final dnsResolver = PixivDnsResolver();
   final client = RhttpClient.createSync(
     settings: ClientSettings(
       timeoutSettings: const TimeoutSettings(
@@ -32,8 +34,11 @@ final pixivHttpClientProvider = Provider<RhttpClient>((ref) {
         timeout: Duration(seconds: 20),
       ),
       userAgent: 'PixivAndroidApp/$version (Android 11; Pixel 5)',
+      dnsSettings: DnsSettings.dynamic(resolver: dnsResolver.resolve),
+      tlsSettings: const TlsSettings(verifyCertificates: false, sni: false),
     ),
   );
+  ref.onDispose(dnsResolver.dispose);
   ref.onDispose(client.dispose);
   return client;
 }, name: 'pixivHttpClientProvider');

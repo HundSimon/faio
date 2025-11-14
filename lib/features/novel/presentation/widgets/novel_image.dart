@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import 'package:faio/data/pixiv/pixiv_image_cache.dart';
+
 class ResilientNetworkImage extends StatefulWidget {
   const ResilientNetworkImage({
     required this.urls,
@@ -25,10 +27,13 @@ class _ResilientNetworkImageState extends State<ResilientNetworkImage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUrl = widget.urls[_index].toString();
+    final currentUri = widget.urls[_index];
+    final cacheManager = pixivImageCacheManagerForUrl(currentUri);
+    final currentUrl = currentUri.toString();
     final imageProvider = CachedNetworkImageProvider(
       currentUrl,
       headers: widget.headers,
+      cacheManager: cacheManager,
     );
     return Image(
       image: imageProvider,

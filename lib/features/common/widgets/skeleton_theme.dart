@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 const kFaioSkeletonEffect = ShimmerEffect(

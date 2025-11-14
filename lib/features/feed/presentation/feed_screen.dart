@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
@@ -26,7 +27,6 @@ class _ResilientNetworkImage extends StatefulWidget {
     required this.urls,
     this.headers,
     this.fit = BoxFit.cover,
-    this.alignment = Alignment.center,
     this.errorBuilder,
     this.placeholder,
   }) : assert(urls.length > 0, 'urls must not be empty');
@@ -34,7 +34,6 @@ class _ResilientNetworkImage extends StatefulWidget {
   final List<Uri> urls;
   final Map<String, String>? headers;
   final BoxFit fit;
-  final AlignmentGeometry alignment;
   final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
   final Widget? placeholder;
 
@@ -47,15 +46,18 @@ class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUrl = widget.urls[_index].toString();
+    final currentUri = widget.urls[_index];
+    final cacheManager = pixivImageCacheManagerForUrl(currentUri);
+    final currentUrl = currentUri.toString();
     final imageProvider = CachedNetworkImageProvider(
       currentUrl,
       headers: widget.headers,
+      cacheManager: cacheManager,
     );
     return Image(
       image: imageProvider,
       fit: widget.fit,
-      alignment: widget.alignment,
+      alignment: Alignment.center,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
           return child;

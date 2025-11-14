@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
@@ -469,10 +470,10 @@ class _ContentThumbnailState extends State<_ContentThumbnail> {
     final urls = pixivImageUrlCandidates(preview);
     final headers = pixivImageHeaders(content: widget.content, url: preview);
     final currentUrl = urls[_index];
-
     final imageProvider = CachedNetworkImageProvider(
       currentUrl.toString(),
       headers: headers,
+      cacheManager: pixivImageCacheManagerForUrl(currentUrl),
     );
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
@@ -620,9 +621,11 @@ class _PreviewImageState extends State<_PreviewImage> {
     final headers = pixivImageHeaders(content: widget.content, url: widget.url);
     final theme = Theme.of(context);
 
+    final currentUrl = urls[_index];
     final imageProvider = CachedNetworkImageProvider(
-      urls[_index].toString(),
+      currentUrl.toString(),
       headers: headers,
+      cacheManager: pixivImageCacheManagerForUrl(currentUrl),
     );
     return Image(
       image: imageProvider,

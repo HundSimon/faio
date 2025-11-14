@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
@@ -158,7 +159,6 @@ class _IllustrationDetailScreenState
       }
     });
 
-    final theme = Theme.of(context);
     if (_currentIndex < 0) {
       return Scaffold(
         appBar: AppBar(),
@@ -526,14 +526,12 @@ class _ProgressiveIllustrationImage extends StatefulWidget {
     this.lowRes,
     this.highRes,
     this.fit = BoxFit.cover,
-    this.alignment = Alignment.center,
   });
 
   final FaioContent content;
   final Uri? lowRes;
   final Uri? highRes;
   final BoxFit fit;
-  final AlignmentGeometry alignment;
 
   @override
   State<_ProgressiveIllustrationImage> createState() =>
@@ -562,9 +560,10 @@ class _ProgressiveIllustrationImageState
                 image: CachedNetworkImageProvider(
                   widget.lowRes.toString(),
                   headers: pixivImageHeaders(content: widget.content),
+                  cacheManager: pixivImageCacheManagerForUrl(widget.lowRes),
                 ),
                 fit: widget.fit,
-                alignment: widget.alignment,
+                alignment: Alignment.center,
                 errorBuilder: (_, __, ___) => Container(color: backgroundColor),
               )
             : Container(color: backgroundColor),
@@ -581,9 +580,10 @@ class _ProgressiveIllustrationImageState
               image: CachedNetworkImageProvider(
                 widget.highRes.toString(),
                 headers: pixivImageHeaders(content: widget.content),
+                cacheManager: pixivImageCacheManagerForUrl(widget.highRes),
               ),
               fit: widget.fit,
-              alignment: widget.alignment,
+              alignment: Alignment.center,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null && !_highResLoaded) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {

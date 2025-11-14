@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
@@ -1405,6 +1406,7 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
                 image: CachedNetworkImageProvider(
                   widget.lowRes.toString(),
                   headers: pixivImageHeaders(url: widget.lowRes),
+                  cacheManager: pixivImageCacheManagerForUrl(widget.lowRes),
                 ),
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
@@ -1425,6 +1427,7 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
               image: CachedNetworkImageProvider(
                 widget.highRes.toString(),
                 headers: pixivImageHeaders(url: widget.highRes),
+                cacheManager: pixivImageCacheManagerForUrl(widget.highRes),
               ),
               fit: BoxFit.cover,
               loadingBuilder: (context, child, loadingProgress) {
