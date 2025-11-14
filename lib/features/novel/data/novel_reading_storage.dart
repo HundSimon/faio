@@ -57,7 +57,7 @@ class NovelReadingStorage {
   Future<void> saveProgress(NovelReadingProgress progress) async {
     final prefs = await _prefsFuture;
     final key = _progressKey(progress.novelId);
-    if (progress.isCompleted || progress.relativeOffset <= 0.01) {
+    if (progress.relativeOffset <= 0.01) {
       await prefs.remove(key);
       return;
     }
