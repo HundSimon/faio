@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -210,62 +211,104 @@ class _IllustrationTab extends ConsumerStatefulWidget {
   ConsumerState<_IllustrationTab> createState() => _IllustrationTabState();
 }
 
-class _IllustrationTabState extends ConsumerState<_IllustrationTab> {
+class _SourceEntry {
+  const _SourceEntry(this.item, this.globalIndex);
+
+  final FaioContent item;
+  final int globalIndex;
+}
+
+class _IllustrationTabState extends ConsumerState<_IllustrationTab>
+    with TickerProviderStateMixin {
+  static const _pixivTabIndex = 0;
+  static const _e621TabIndex = 1;
   static const _horizontalPadding = 16.0;
   static const _verticalPadding = 16.0;
   static const _crossAxisSpacing = 12.0;
   static const _mainAxisSpacing = 12.0;
   static const _crossAxisCount = 2;
 
-  late final ScrollController _scrollController;
+  late final TabController _sourceTabController;
+  late final ScrollController _pixivScrollController;
+  late final ScrollController _e621ScrollController;
+  var _tabsVisible = true;
+  var _suppressVisibilityUpdates = false;
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController()..addListener(_onScroll);
+    _sourceTabController = TabController(length: 2, vsync: this);
+    _pixivScrollController = ScrollController()..addListener(_onPixivScroll);
+    _e621ScrollController = ScrollController()..addListener(_onE621Scroll);
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
+    _pixivScrollController.removeListener(_onPixivScroll);
+    _e621ScrollController.removeListener(_onE621Scroll);
+    _pixivScrollController.dispose();
+    _e621ScrollController.dispose();
+    _sourceTabController.dispose();
     super.dispose();
   }
 
-  void _onScroll() {
-    if (!_scrollController.hasClients) {
+  void _onPixivScroll() {
+    if (!_pixivScrollController.hasClients) {
       return;
     }
-    final position = _scrollController.position;
+    _updateTabVisibility(_pixivScrollController);
+    final position = _pixivScrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      ref.read(feedControllerProvider.notifier).loadMore();
+    }
+  }
+
+  void _onE621Scroll() {
+    if (!_e621ScrollController.hasClients) {
+      return;
+    }
+    _updateTabVisibility(_e621ScrollController);
+    final position = _e621ScrollController.position;
     if (position.pixels >= position.maxScrollExtent - 200) {
       ref.read(feedControllerProvider.notifier).loadMore();
     }
   }
 
   Future<void> _scrollToIndex(int index) async {
-    if (!_scrollController.hasClients) {
+    final items = ref.read(feedControllerProvider).items;
+    if (index < 0 || index >= items.length) {
       return;
     }
-    final width = context.size?.width ?? MediaQuery.of(context).size.width;
-    final gridWidth =
-        width -
-        (_horizontalPadding * 2) -
-        (_crossAxisSpacing * (_crossAxisCount - 1));
-    final tileWidth = gridWidth / _crossAxisCount;
-    final tileHeight = tileWidth;
-    final rowHeight = tileHeight + _mainAxisSpacing;
-    final row = index ~/ _crossAxisCount;
-    final targetOffset =
-        _verticalPadding + row * rowHeight - (_mainAxisSpacing / 2);
+    final source = items[index].source.toLowerCase();
+    final targetTab =
+        source.startsWith('pixiv') ? _pixivTabIndex : _e621TabIndex;
 
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final clampedOffset = targetOffset.clamp(0.0, maxScroll);
+    if (_sourceTabController.index != targetTab) {
+      _sourceTabController.animateTo(targetTab);
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+    }
 
-    await _scrollController.animateTo(
-      clampedOffset,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    final localIndex = _localIndexForSource(items, index, targetTab);
+    if (localIndex == null) {
+      return;
+    }
+    final controller =
+        targetTab == _pixivTabIndex ? _pixivScrollController : _e621ScrollController;
+    if (!controller.hasClients) {
+      return;
+    }
+    _setTabsVisible(true);
+    _suppressVisibilityUpdates = true;
+    final offset = _calculateScrollOffset(controller, localIndex);
+    try {
+      await controller.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } finally {
+      _suppressVisibilityUpdates = false;
+    }
   }
 
   @override
@@ -285,8 +328,8 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab> {
       if (!mounted) return;
       final targetIndex = next.pendingScrollIndex;
       if (targetIndex != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToIndex(targetIndex);
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _scrollToIndex(targetIndex);
           final controller = ref.read(feedSelectionProvider.notifier);
           controller.clearScrollRequest();
           controller.clearSelection();
@@ -297,6 +340,16 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab> {
     final feedState = ref.watch(feedControllerProvider);
     final notifier = ref.read(feedControllerProvider.notifier);
     final items = feedState.items;
+    final pixivEntries = <_SourceEntry>[];
+    final e621Entries = <_SourceEntry>[];
+    for (var i = 0; i < items.length; i++) {
+      final source = items[i].source.toLowerCase();
+      if (source.startsWith('pixiv')) {
+        pixivEntries.add(_SourceEntry(items[i], i));
+      } else if (source.startsWith('e621')) {
+        e621Entries.add(_SourceEntry(items[i], i));
+      }
+    }
     final isLoading = feedState.isLoadingInitial;
     final shouldShowSkeleton = isLoading && items.isEmpty;
     final showEmptyState = !isLoading && items.isEmpty;
@@ -304,63 +357,42 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab> {
         ? _estimateIllustrationSkeletonCount(context)
         : 0;
     final showLoadMore = !shouldShowSkeleton && feedState.hasMore;
-    final itemCount = shouldShowSkeleton
-        ? skeletonCount
-        : items.length + (showLoadMore ? 1 : 0);
 
     if (showEmptyState) {
-      final theme = Theme.of(context);
-      return RefreshIndicator(
-        onRefresh: notifier.refresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.4,
-              child: Center(
-                child: Text(
-                  '暂时没有插画内容',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildGlobalEmptyState(context, notifier);
     }
 
-    return RefreshIndicator(
-      onRefresh: notifier.refresh,
-      child: Skeletonizer(
-        effect: kFaioSkeletonEffect,
-        enabled: shouldShowSkeleton,
-        child: GridView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.symmetric(
-            horizontal: _horizontalPadding,
-            vertical: _verticalPadding,
+    return Column(
+      children: [
+        _buildSourceTabs(context),
+        Expanded(
+          child: AnimatedBuilder(
+            animation: _sourceTabController,
+            builder: (context, _) {
+              final tabIndex = _sourceTabController.index;
+              return IndexedStack(
+                index: tabIndex,
+                children: [
+                  _buildPixivGrid(
+                    entries: pixivEntries,
+                    notifier: notifier,
+                    shouldShowSkeleton: shouldShowSkeleton,
+                    skeletonCount: skeletonCount,
+                    showLoadMore: showLoadMore,
+                  ),
+                  _buildE621Grid(
+                    entries: e621Entries,
+                    notifier: notifier,
+                    shouldShowSkeleton: shouldShowSkeleton,
+                    skeletonCount: skeletonCount,
+                    showLoadMore: showLoadMore,
+                  ),
+                ],
+              );
+            },
           ),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _crossAxisCount,
-            mainAxisSpacing: _mainAxisSpacing,
-            crossAxisSpacing: _crossAxisSpacing,
-            childAspectRatio: 1,
-          ),
-          itemCount: itemCount,
-          itemBuilder: (context, index) {
-            if (shouldShowSkeleton) {
-              return const _IllustrationSkeletonTile();
-            }
-            if (showLoadMore && index >= items.length) {
-              return _LoadMoreTile(provider: feedControllerProvider);
-            }
-            final item = items[index];
-            return _IllustrationTile(item: item, index: index);
-          },
         ),
-      ),
+      ],
     );
   }
 
@@ -376,6 +408,328 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab> {
     return math.max(minRows * _crossAxisCount, _crossAxisCount * 4);
   }
 
+  Widget _buildGlobalEmptyState(
+    BuildContext context,
+    FeedController notifier,
+  ) {
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: notifier.refresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.4,
+            child: Center(
+              child: Text(
+                '暂时没有插画内容',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceTabs(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final tabBar = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceVariant.withOpacity(
+            theme.brightness == Brightness.dark ? 0.4 : 0.6,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: TabBar(
+          controller: _sourceTabController,
+          indicator: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          dividerColor: Colors.transparent,
+          indicatorSize: TabBarIndicatorSize.tab,
+          labelPadding: EdgeInsets.zero,
+          tabs: [
+            Tab(
+              child: _SourceTabLabel(
+                label: 'Pixiv',
+                color: colorScheme.primary,
+              ),
+            ),
+            Tab(
+              child: _SourceTabLabel(
+                label: 'e621',
+                color: colorScheme.tertiary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return ClipRect(
+      child: AnimatedAlign(
+        alignment: Alignment.topCenter,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInOut,
+        heightFactor: _tabsVisible ? 1 : 0,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: _tabsVisible ? 1 : 0,
+          child: tabBar,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPixivGrid({
+    required List<_SourceEntry> entries,
+    required FeedController notifier,
+    required bool shouldShowSkeleton,
+    required int skeletonCount,
+    required bool showLoadMore,
+  }) {
+    if (!shouldShowSkeleton && entries.isEmpty) {
+      final theme = Theme.of(context);
+      return RefreshIndicator(
+        onRefresh: notifier.refresh,
+        child: ListView(
+          controller: _pixivScrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.3,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.casino_outlined,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '暂时没有 Pixiv 插画',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '点击“换一批”或下拉刷新，获取新的随机精选作品',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final itemCount = shouldShowSkeleton
+        ? skeletonCount
+        : entries.length + (showLoadMore ? 1 : 0);
+
+    return RefreshIndicator(
+      onRefresh: notifier.refresh,
+      child: Skeletonizer(
+        effect: kFaioSkeletonEffect,
+        enabled: shouldShowSkeleton,
+        child: GridView.builder(
+          controller: _pixivScrollController,
+          padding: const EdgeInsets.symmetric(
+            horizontal: _horizontalPadding,
+            vertical: _verticalPadding,
+          ),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _crossAxisCount,
+            mainAxisSpacing: _mainAxisSpacing,
+            crossAxisSpacing: _crossAxisSpacing,
+            childAspectRatio: 1,
+          ),
+          itemCount: itemCount,
+          itemBuilder: (context, index) {
+            if (shouldShowSkeleton) {
+              return const _IllustrationSkeletonTile();
+            }
+            if (showLoadMore && index >= entries.length) {
+              return _LoadMoreTile(provider: feedControllerProvider);
+            }
+            final entry = entries[index];
+            return _IllustrationTile(
+              item: entry.item,
+              index: entry.globalIndex,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildE621Grid({
+    required List<_SourceEntry> entries,
+    required FeedController notifier,
+    required bool shouldShowSkeleton,
+    required int skeletonCount,
+    required bool showLoadMore,
+  }) {
+    if (!shouldShowSkeleton && entries.isEmpty) {
+      final theme = Theme.of(context);
+      return RefreshIndicator(
+        onRefresh: notifier.refresh,
+        child: ListView(
+          controller: _e621ScrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.3,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.schedule_outlined,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '暂时没有 e621 插画',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '稍后再来看看或下拉刷新，即可查看最新倒序内容',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final itemCount = shouldShowSkeleton
+        ? skeletonCount
+        : entries.length + (showLoadMore ? 1 : 0);
+
+    return RefreshIndicator(
+      onRefresh: notifier.refresh,
+      child: Skeletonizer(
+        effect: kFaioSkeletonEffect,
+        enabled: shouldShowSkeleton,
+        child: GridView.builder(
+          controller: _e621ScrollController,
+          padding: const EdgeInsets.symmetric(
+            horizontal: _horizontalPadding,
+            vertical: _verticalPadding,
+          ),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _crossAxisCount,
+            mainAxisSpacing: _mainAxisSpacing,
+            crossAxisSpacing: _crossAxisSpacing,
+            childAspectRatio: 1,
+          ),
+          itemCount: itemCount,
+          itemBuilder: (context, index) {
+            if (shouldShowSkeleton) {
+              return const _IllustrationSkeletonTile();
+            }
+            if (showLoadMore && index >= entries.length) {
+              return _LoadMoreTile(provider: feedControllerProvider);
+            }
+            final entry = entries[index];
+            return _IllustrationTile(
+              item: entry.item,
+              index: entry.globalIndex,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  double _calculateScrollOffset(ScrollController controller, int localIndex) {
+    final width = context.size?.width ?? MediaQuery.of(context).size.width;
+    final gridWidth =
+        width -
+        (_horizontalPadding * 2) -
+        (_crossAxisSpacing * (_crossAxisCount - 1));
+    final tileWidth = gridWidth / _crossAxisCount;
+    final tileHeight = tileWidth;
+    final rowHeight = tileHeight + _mainAxisSpacing;
+    final row = localIndex ~/ _crossAxisCount;
+    final targetOffset =
+        _verticalPadding + row * rowHeight - (_mainAxisSpacing / 2);
+    final maxScroll = controller.position.maxScrollExtent;
+    return targetOffset.clamp(0.0, maxScroll);
+  }
+
+  int? _localIndexForSource(
+    List<FaioContent> items,
+    int globalIndex,
+    int targetTab,
+  ) {
+    var local = 0;
+    for (var i = 0; i < items.length; i++) {
+      final source = items[i].source.toLowerCase();
+      final isPixiv = source.startsWith('pixiv');
+      final matches = targetTab == _pixivTabIndex ? isPixiv : source.startsWith('e621');
+      if (!matches) continue;
+      if (i == globalIndex) {
+        return local;
+      }
+      local += 1;
+    }
+    return null;
+  }
+
+  void _updateTabVisibility(ScrollController controller) {
+    if (_suppressVisibilityUpdates || !controller.hasClients) {
+      return;
+    }
+    final position = controller.position;
+    final direction = position.userScrollDirection;
+    final isNearTop = position.pixels <=
+        (position.minScrollExtent + 8.0);
+    if (direction == ScrollDirection.reverse && !isNearTop) {
+      _setTabsVisible(false);
+    } else if (direction == ScrollDirection.forward || isNearTop) {
+      _setTabsVisible(true);
+    }
+  }
+
+  void _setTabsVisible(bool visible) {
+    if (_tabsVisible == visible) {
+      return;
+    }
+    setState(() {
+      _tabsVisible = visible;
+    });
+  }
 }
 
 class _MangaTab extends ConsumerStatefulWidget {
@@ -725,6 +1079,42 @@ class _IllustrationSkeletonTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(color: color),
       ),
+    );
+  }
+}
+
+class _SourceTabLabel extends StatelessWidget {
+  const _SourceTabLabel({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
