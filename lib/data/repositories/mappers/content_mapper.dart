@@ -67,10 +67,10 @@ class ContentMapper {
 
   static FaioContent? fromPixivIllust(PixivIllust illust) {
     final previewImage =
-        illust.imageUrls.squareMedium ??
         illust.imageUrls.medium ??
         illust.imageUrls.large ??
-        illust.metaPages.firstOrNull?.imageUrls.medium;
+        illust.metaPages.firstOrNull?.imageUrls.medium ??
+        illust.imageUrls.squareMedium;
     final sampleImage =
         illust.imageUrls.large ??
         illust.metaPages.firstOrNull?.imageUrls.large ??
