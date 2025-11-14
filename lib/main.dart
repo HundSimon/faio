@@ -1,13 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rhttp/rhttp.dart';
 
 import 'app/app.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    const ProviderScope(
-      child: FaioApp(),
-    ),
-  );
+  await Rhttp.init();
+  runApp(const ProviderScope(child: FaioApp()));
 }

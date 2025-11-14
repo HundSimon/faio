@@ -1,42 +1,39 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rhttp/rhttp.dart';
 
+import 'interceptors/logging_interceptor.dart';
 import 'interceptors/user_agent_interceptor.dart';
 import 'network_config.dart';
 
-final _dioBaseOptionsProvider = Provider<BaseOptions>((ref) {
+final _clientSettingsProvider = Provider<ClientSettings>((ref) {
   final config = ref.watch(networkConfigProvider);
-  return BaseOptions(
-    connectTimeout: config.connectTimeout,
-    receiveTimeout: config.receiveTimeout,
-    sendTimeout: config.sendTimeout,
-    headers: {
-      'User-Agent': config.userAgent,
-      'Accept': 'application/json',
-    },
-    responseType: ResponseType.json,
+  final timeout = config.receiveTimeout > config.sendTimeout
+      ? config.receiveTimeout
+      : config.sendTimeout;
+  return ClientSettings(
+    timeoutSettings: TimeoutSettings(
+      connectTimeout: config.connectTimeout,
+      timeout: timeout,
+    ),
+    userAgent: config.userAgent,
+    throwOnStatusCode: true,
   );
 });
 
-/// Provides a preconfigured Dio instance with common interceptors.
-final dioProvider = Provider<Dio>((ref) {
-  final baseOptions = ref.watch(_dioBaseOptionsProvider);
+/// Provides a preconfigured RhttpClient instance with common interceptors.
+final rhttpClientProvider = Provider<RhttpClient>((ref) {
+  final settings = ref.watch(_clientSettingsProvider);
   final config = ref.watch(networkConfigProvider);
 
-  final dio = Dio(baseOptions);
+  final interceptors = <Interceptor>[
+    UserAgentInterceptor(config.userAgent),
+    if (config.logNetworking) LoggingInterceptor(),
+  ];
 
-  dio.interceptors.add(UserAgentInterceptor(config.userAgent));
-
-  if (config.logNetworking) {
-    dio.interceptors.add(
-      LogInterceptor(
-        request: true,
-        requestBody: false,
-        responseBody: false,
-        responseHeader: false,
-      ),
-    );
-  }
-
-  return dio;
-}, name: 'dioProvider');
+  final client = RhttpClient.createSync(
+    settings: settings,
+    interceptors: interceptors,
+  );
+  ref.onDispose(client.dispose);
+  return client;
+}, name: 'rhttpClientProvider');

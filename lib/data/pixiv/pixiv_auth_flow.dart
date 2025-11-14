@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
-import 'package:dio/dio.dart';
+import 'package:rhttp/rhttp.dart';
 
 import 'pixiv_credentials.dart';
 import 'pixiv_oauth_client.dart';
@@ -25,18 +25,23 @@ class PixivLoginSession {
 
 class PixivAuthFlow {
   PixivAuthFlow({
-    required Dio dio,
+    required RhttpClient client,
     required PixivOAuthClient oauthClient,
+    required String appVersion,
     void Function(String version)? onVersionDetected,
-  }) : _dio = dio,
+  }) : _client = client,
        _oauthClient = oauthClient,
+       _appVersion = appVersion,
        _onVersionDetected = onVersionDetected;
 
-  final Dio _dio;
+  final RhttpClient _client;
   final PixivOAuthClient _oauthClient;
+  final String _appVersion;
   final void Function(String version)? _onVersionDetected;
 
   static const _loginPath = 'https://app-api.pixiv.net/web/v1/login';
+  static const _applicationInfoUrl =
+      'https://app-api.pixiv.net/v1/application-info/android';
   static const redirectUri =
       'https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback';
   static const _defaultVersion = '5.0.234';
@@ -83,11 +88,12 @@ class PixivAuthFlow {
 
   Future<String> _fetchLatestVersion() async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
-        '/v1/application-info/android',
-        options: Options(responseType: ResponseType.json),
+      final response = await _client.requestText(
+        method: HttpMethod.get,
+        url: _applicationInfoUrl,
+        headers: HttpHeaders.rawMap(_buildBaseHeaders()),
       );
-      final data = response.data;
+      final data = jsonDecode(response.body);
       if (data == null) {
         return _defaultVersion;
       }
@@ -99,9 +105,20 @@ class PixivAuthFlow {
         }
       }
       return _defaultVersion;
-    } catch (_) {
+    } on RhttpException {
       return _defaultVersion;
     }
+  }
+
+  Map<String, String> _buildBaseHeaders() {
+    return {
+      'User-Agent': 'PixivAndroidApp/$_appVersion (Android 11; Pixel 5)',
+      'Accept-Language': 'zh-CN',
+      'App-OS': 'android',
+      'App-OS-Version': '11',
+      'App-Version': _appVersion,
+      'Referer': 'https://app-api.pixiv.net/',
+    };
   }
 
   String _generateCodeVerifier() {

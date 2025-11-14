@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+import 'package:rhttp/rhttp.dart';
 
 /// Ensures every request carries the expected User-Agent header unless
 /// overridden manually.
@@ -8,8 +8,20 @@ class UserAgentInterceptor extends Interceptor {
   final String userAgent;
 
   @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    options.headers.putIfAbsent('User-Agent', () => userAgent);
-    handler.next(options);
+  Future<InterceptorResult<HttpRequest>> beforeRequest(
+    HttpRequest request,
+  ) async {
+    final headers = request.headers ?? HttpHeaders.empty;
+    if (headers.containsKey(HttpHeaderName.userAgent)) {
+      return Interceptor.next(request);
+    }
+    return Interceptor.next(
+      request.copyWith(
+        headers: headers.copyWith(
+          name: HttpHeaderName.userAgent,
+          value: userAgent,
+        ),
+      ),
+    );
   }
 }

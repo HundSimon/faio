@@ -1,23 +1,22 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rhttp/rhttp.dart';
 
 import 'furrynovel_service.dart';
 
-final furryNovelDioProvider = Provider<Dio>((ref) {
-  final options = BaseOptions(
-    baseUrl: 'https://api.furrynovel.ink',
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 15),
-    responseType: ResponseType.json,
-    headers: const {
-      'Referer': 'https://furrynovel.ink/',
-      'Accept': 'application/json',
-    },
+final furryNovelClientProvider = Provider<RhttpClient>((ref) {
+  final client = RhttpClient.createSync(
+    settings: const ClientSettings(
+      timeoutSettings: TimeoutSettings(
+        connectTimeout: Duration(seconds: 15),
+        timeout: Duration(seconds: 15),
+      ),
+    ),
   );
-  return Dio(options);
-}, name: 'furryNovelDioProvider');
+  ref.onDispose(client.dispose);
+  return client;
+}, name: 'furryNovelClientProvider');
 
 final furryNovelServiceProvider = Provider<FurryNovelService>((ref) {
-  final dio = ref.watch(furryNovelDioProvider);
-  return FurryNovelService(dio: dio);
+  final client = ref.watch(furryNovelClientProvider);
+  return FurryNovelService(client: client);
 }, name: 'furryNovelServiceProvider');

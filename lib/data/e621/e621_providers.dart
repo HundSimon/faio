@@ -13,11 +13,11 @@ final e621RateLimiterProvider = Provider<RateLimiter>((ref) {
 }, name: 'e621RateLimiterProvider');
 
 final e621HttpServiceProvider = Provider<E621Service>((ref) {
-  final dio = ref.watch(dioProvider);
+  final client = ref.watch(rhttpClientProvider);
   final credentials = ref.watch(e621AuthProvider);
   final rateLimiter = ref.watch(e621RateLimiterProvider);
   return E621HttpService(
-    dio: dio,
+    client: client,
     rateLimiter: rateLimiter,
     credentials: credentials,
   );

@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
-import 'package:dio/dio.dart';
+import 'package:rhttp/rhttp.dart';
 
 import '../../core/network/rate_limiter.dart';
 import 'models/pixiv_models.dart';
@@ -19,20 +20,22 @@ class PixivAuthenticationRequiredException implements Exception {
 /// Talks to Pixiv's public API using OAuth tokens obtained on-device.
 class PixivHttpService implements PixivService {
   PixivHttpService({
-    required Dio dio,
+    required RhttpClient client,
     required PixivOAuthClient oauthClient,
     required RateLimiter rateLimiter,
     required String appVersion,
     PixivCredentials? credentials,
     void Function(PixivCredentials credentials)? onCredentialsRefreshed,
-  }) : _dio = dio,
+  }) : _client = client,
        _oauthClient = oauthClient,
        _rateLimiter = rateLimiter,
        _appVersion = appVersion,
        _credentials = credentials,
        _onCredentialsRefreshed = onCredentialsRefreshed;
 
-  final Dio _dio;
+  static const _baseUrl = 'https://app-api.pixiv.net';
+
+  final RhttpClient _client;
   final PixivOAuthClient _oauthClient;
   final RateLimiter _rateLimiter;
   final String _appVersion;
@@ -137,55 +140,88 @@ class PixivHttpService implements PixivService {
     final credentials = await _ensureCredentials();
     await _rateLimiter.acquire();
 
-    Response<Map<String, dynamic>> response;
     try {
-      final headers = {
-        ..._buildBaseHeaders(includeAppHeaders: false),
-        'Authorization': 'Bearer ${credentials.accessToken}',
-      };
-      if (uri != null) {
-        response = await _dio.getUri<Map<String, dynamic>>(
-          uri,
-          options: Options(headers: headers),
-        );
-      } else {
-        response = await _dio.get<Map<String, dynamic>>(
-          path!,
-          queryParameters: queryParameters,
-          options: Options(headers: headers),
-        );
-      }
-    } on DioException catch (error) {
-      if (_isAuthFailure(error)) {
+      final response = await _performRequest(
+        credentials: credentials,
+        path: path,
+        queryParameters: queryParameters,
+        uri: uri,
+      );
+      return _decodeJson(response.body);
+    } on RhttpStatusCodeException catch (error) {
+      if (_isAuthFailure(error.statusCode)) {
         final refreshed = await _refreshCredentials(credentials);
-        final retryHeaders = {
-          ..._buildBaseHeaders(includeAppHeaders: false),
-          'Authorization': 'Bearer ${refreshed.accessToken}',
-        };
-        if (uri != null) {
-          response = await _dio.getUri<Map<String, dynamic>>(
-            uri,
-            options: Options(headers: retryHeaders),
-          );
-        } else {
-          response = await _dio.get<Map<String, dynamic>>(
-            path!,
-            queryParameters: queryParameters,
-            options: Options(headers: retryHeaders),
-          );
-        }
-      } else {
-        rethrow;
+        final retryResponse = await _performRequest(
+          credentials: refreshed,
+          path: path,
+          queryParameters: queryParameters,
+          uri: uri,
+        );
+        return _decodeJson(retryResponse.body);
       }
+      rethrow;
     }
-
-    return response.data ?? const {};
   }
 
-  bool _isAuthFailure(DioException error) {
-    final status = error.response?.statusCode ?? 0;
-    return status == 401 || status == 403;
+  Future<HttpTextResponse> _performRequest({
+    required PixivCredentials credentials,
+    String? path,
+    Map<String, dynamic>? queryParameters,
+    Uri? uri,
+  }) {
+    final headers = HttpHeaders.rawMap({
+      ..._buildBaseHeaders(includeAppHeaders: true),
+      'Authorization': 'Bearer ${credentials.accessToken}',
+    });
+    final url = uri?.toString() ?? _resolveUrl(path);
+    return _client.requestText(
+      method: HttpMethod.get,
+      url: url,
+      query: uri == null ? _normalizeQuery(queryParameters) : null,
+      headers: headers,
+    );
   }
+
+  Map<String, String>? _normalizeQuery(Map<String, dynamic>? raw) {
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    final normalized = <String, String>{};
+    raw.forEach((key, value) {
+      if (value == null) {
+        return;
+      }
+      normalized[key] = value.toString();
+    });
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  String _resolveUrl(String? path) {
+    if (path == null || path.isEmpty) {
+      throw ArgumentError('Either a path or uri must be provided.');
+    }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    return '$_baseUrl$path';
+  }
+
+  Map<String, dynamic> _decodeJson(String body) {
+    if (body.isEmpty) {
+      return const {};
+    }
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Ignore parsing failures, return empty map for consistency.
+    }
+    return const {};
+  }
+
+  bool _isAuthFailure(int statusCode) => statusCode == 401 || statusCode == 403;
 
   Future<PixivCredentials> _ensureCredentials() async {
     final current = _credentials;

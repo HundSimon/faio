@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:dio/dio.dart';
+import 'package:rhttp/rhttp.dart';
 
 import '../../core/network/rate_limiter.dart';
 import 'e621_credentials.dart';
@@ -9,15 +9,15 @@ import 'models/e621_post.dart';
 
 class E621HttpService implements E621Service {
   E621HttpService({
-    required Dio dio,
+    required RhttpClient client,
     required RateLimiter rateLimiter,
     E621Credentials? credentials,
-  })  : _dio = dio,
-        _rateLimiter = rateLimiter,
-        _credentials = credentials;
+  }) : _client = client,
+       _rateLimiter = rateLimiter,
+       _credentials = credentials;
 
   static const _baseUrl = 'https://e621.net';
-  final Dio _dio;
+  final RhttpClient _client;
   final RateLimiter _rateLimiter;
   final E621Credentials? _credentials;
 
@@ -27,11 +27,7 @@ class E621HttpService implements E621Service {
     int limit = 20,
     List<String> tags = const [],
   }) async {
-    return _request(
-      page: page,
-      limit: limit,
-      tags: tags,
-    );
+    return _request(page: page, limit: limit, tags: tags);
   }
 
   @override
@@ -40,12 +36,10 @@ class E621HttpService implements E621Service {
     int page = 1,
     int limit = 20,
   }) async {
-    final composedTags = query.trim().isEmpty ? <String>[] : query.trim().split(RegExp(r'\s+'));
-    return _request(
-      page: page,
-      limit: limit,
-      tags: composedTags,
-    );
+    final composedTags = query.trim().isEmpty
+        ? <String>[]
+        : query.trim().split(RegExp(r'\s+'));
+    return _request(page: page, limit: limit, tags: composedTags);
   }
 
   Future<List<E621Post>> _request({
@@ -60,7 +54,8 @@ class E621HttpService implements E621Service {
         .where((tag) => tag.isNotEmpty)
         .toList(growable: false);
     final queryTags = <String>[
-      if (!normalizedTags.any((tag) => tag.startsWith('order:'))) 'order:id_desc',
+      if (!normalizedTags.any((tag) => tag.startsWith('order:')))
+        'order:id_desc',
       ...normalizedTags,
     ];
 
@@ -73,19 +68,18 @@ class E621HttpService implements E621Service {
     }
 
     final clampedLimit = limit.clamp(1, 320);
-    final response = await _dio.get<Map<String, dynamic>>(
-      '$_baseUrl/posts.json',
-      queryParameters: {
-        'page': page,
-        'limit': clampedLimit,
+    final response = await _client.requestText(
+      method: HttpMethod.get,
+      url: '$_baseUrl/posts.json',
+      query: {
+        'page': '$page',
+        'limit': '$clampedLimit',
         if (queryTags.isNotEmpty) 'tags': queryTags.join(' '),
       },
-      options: Options(
-        headers: authHeaders.isEmpty ? null : authHeaders,
-      ),
+      headers: authHeaders.isEmpty ? null : HttpHeaders.rawMap(authHeaders),
     );
 
-    final data = response.data;
+    final data = _decodeJson(response.body);
     if (data == null) {
       return const [];
     }
@@ -101,5 +95,20 @@ class E621HttpService implements E621Service {
         .toList();
     parsed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return parsed;
+  }
+
+  Map<String, dynamic>? _decodeJson(String body) {
+    if (body.isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 }
