@@ -506,12 +506,10 @@ class _NovelDetailContent extends ConsumerWidget {
         );
       }),
     );
-    final primaryLink = favoriteEntry.originalUrl ??
-        (favoriteEntry.sourceLinks.isNotEmpty
-            ? favoriteEntry.sourceLinks.first
-            : null);
-
-    Widget buildHero() {
+    Widget buildHero({
+      double? height,
+      double aspectRatio = 0.75,
+    }) {
       final lowResCover =
           initialContent?.previewUrl ?? initialContent?.sampleUrl;
       return _NovelHeroImage(
@@ -519,28 +517,164 @@ class _NovelDetailContent extends ConsumerWidget {
         lowRes: lowResCover,
         highRes: coverUrl ?? lowResCover,
         fallbackColor: theme.colorScheme.surfaceVariant,
+        height: height,
+        aspectRatio: aspectRatio,
       );
     }
 
-    Widget buildPrimaryActions() {
+    Widget? buildHeaderActions({
+      required bool isCompact,
+      required double maxWidth,
+    }) {
       final baseCount = favoriteEntry.favoriteCount;
       final displayCount = baseCount + (isFavorite ? 1 : 0);
       final favoriteLabel =
           '${isFavorite ? '已收藏' : '收藏'}（$displayCount）';
-      return Row(
-        children: [
-          Expanded(
-            child: FilledButton.icon(
-              icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-              label: Text(favoriteLabel),
-              onPressed: () {
-                ref
-                    .read(libraryFavoritesProvider.notifier)
-                    .toggleContentFavorite(favoriteEntry);
-              },
-            ),
+      final buttons = <Widget>[
+        FilledButton.icon(
+          icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
+          label: Text(favoriteLabel),
+          onPressed: () {
+            ref
+                .read(libraryFavoritesProvider.notifier)
+                .toggleContentFavorite(favoriteEntry);
+          },
+        ),
+      ];
+      if (buttons.isEmpty) {
+        return null;
+      }
+      return Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: buttons
+            .map(
+              (button) => isCompact
+                  ? SizedBox(width: maxWidth, child: button)
+                  : button,
+            )
+            .toList(),
+      );
+    }
+
+    Widget buildHeaderSection() {
+      return Card(
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 520;
+              final coverWidth = math
+                  .min(
+                    isCompact ? constraints.maxWidth * 0.55 : 220,
+                    220.0,
+                  )
+                  .toDouble();
+              final cover = SizedBox(
+                width: coverWidth,
+                child: buildHero(
+                  height: isCompact ? 180 : 220,
+                  aspectRatio: 0.68,
+                ),
+              );
+              final infoChips = <Widget>[];
+              final contentLength = detail.length ?? detail.body.length;
+              if (favoriteEntry.rating.isNotEmpty) {
+                infoChips.add(
+                  _InfoPill(
+                    icon: Icons.shield_outlined,
+                    label: '评级 ${favoriteEntry.rating}',
+                  ),
+                );
+              }
+              if (contentLength > 0) {
+                infoChips.add(
+                  _InfoPill(
+                    icon: Icons.text_snippet_outlined,
+                    label: '约 $contentLength 字',
+                  ),
+                );
+              }
+              if (publishedAt != null) {
+                infoChips.add(
+                  _InfoPill(
+                    icon: Icons.schedule,
+                    label: _formatDate(publishedAt!),
+                  ),
+                );
+              }
+              if (detail.readCount != null && detail.readCount! > 0) {
+                infoChips.add(
+                  _InfoPill(
+                    icon: Icons.visibility,
+                    label: '${detail.readCount} 阅读',
+                  ),
+                );
+              }
+              final headerActions = buildHeaderActions(
+                isCompact: isCompact,
+                maxWidth: constraints.maxWidth,
+              );
+              Widget buildInfoColumn() {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      detail.title,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      authorName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (infoChips.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: infoChips,
+                      ),
+                    ],
+                    if (headerActions != null) ...[
+                      const SizedBox(height: 16),
+                      headerActions,
+                    ],
+                  ],
+                );
+              }
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      alignment: Alignment.center,
+                      child: cover,
+                    ),
+                    const SizedBox(height: 16),
+                    buildInfoColumn(),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  cover,
+                  const SizedBox(width: 24),
+                  Expanded(child: buildInfoColumn()),
+                ],
+              );
+            },
           ),
-        ],
+        ),
       );
     }
 
@@ -590,39 +724,7 @@ class _NovelDetailContent extends ConsumerWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          buildHero(),
-          if (detail.length != null) ...[
-            const SizedBox(height: 12),
-            _InfoPill(
-              icon: Icons.menu_book,
-              label: '${detail.length} 字',
-              background: theme.colorScheme.surfaceVariant,
-            ),
-          ],
-          const SizedBox(height: 20),
-          Text(
-            detail.title,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '评级：${favoriteEntry.rating.isNotEmpty ? favoriteEntry.rating : 'General'}',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            authorName,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 20),
-          buildPrimaryActions(),
+          buildHeaderSection(),
           const SizedBox(height: 16),
           _ReadActionCard(
             detail: detail,
@@ -655,17 +757,6 @@ class _NovelDetailContent extends ConsumerWidget {
                       novelId,
                     )
                 : null,
-          ),
-          const SizedBox(height: 16),
-          DetailSectionCard(
-            title: '作品信息',
-            child: _MetaInfoSection(
-              authorName: authorName,
-              publishedAt: publishedAt,
-              length: detail.length ?? detail.body.length,
-              rating: favoriteEntry.rating,
-              readCount: detail.readCount,
-            ),
           ),
           const SizedBox(height: 16),
           DetailSectionCard(
@@ -1015,59 +1106,6 @@ class _GradientProgressTrack extends StatelessWidget {
   }
 }
 
-class _MetaInfoSection extends StatelessWidget {
-  const _MetaInfoSection({
-    required this.authorName,
-    required this.publishedAt,
-    required this.length,
-    this.rating,
-    this.readCount,
-  });
-
-  final String authorName;
-  final DateTime? publishedAt;
-  final int length;
-  final String? rating;
-  final int? readCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final chips = <Widget>[
-      Chip(
-        avatar: const Icon(Icons.person, size: 18),
-        label: Text(authorName),
-      ),
-      Chip(
-        avatar: const Icon(Icons.schedule, size: 18),
-        label: Text(publishedAt != null
-            ? _formatDate(publishedAt!)
-            : '未知时间'),
-      ),
-      Chip(
-        avatar: const Icon(Icons.text_fields, size: 18),
-        label: Text('约 $length 字'),
-      ),
-      if (rating != null && rating!.isNotEmpty)
-        Chip(
-          avatar: const Icon(Icons.shield, size: 18),
-          label: Text(rating!),
-        ),
-      if (readCount != null && readCount! > 0)
-        Chip(
-          avatar: const Icon(Icons.visibility, size: 18),
-          label: Text('$readCount 阅读'),
-        ),
-    ];
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: chips,
-    );
-  }
-}
-
 class _NovelSeriesPreview extends ConsumerWidget {
   const _NovelSeriesPreview({
     required this.series,
@@ -1271,20 +1309,25 @@ class _NovelHeroImage extends StatelessWidget {
     this.lowRes,
     this.highRes,
     this.fallbackColor,
+    this.height,
+    this.aspectRatio,
   });
 
   final String? contentId;
   final Uri? lowRes;
   final Uri? highRes;
   final Color? fallbackColor;
+  final double? height;
+  final double? aspectRatio;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final resolvedAspectRatio = aspectRatio ?? 0.75;
     Widget child;
     if (lowRes == null && highRes == null) {
       child = Container(
-        height: 260,
+        height: height ?? 260,
         decoration: BoxDecoration(
           color: fallbackColor ?? theme.colorScheme.surfaceVariant,
           borderRadius: BorderRadius.circular(24),
@@ -1300,7 +1343,7 @@ class _NovelHeroImage extends StatelessWidget {
       child = ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: AspectRatio(
-          aspectRatio: 0.75,
+          aspectRatio: resolvedAspectRatio,
           child: _ProgressiveNovelImage(
             lowRes: lowRes,
             highRes: highRes,
@@ -1308,6 +1351,9 @@ class _NovelHeroImage extends StatelessWidget {
           ),
         ),
       );
+      if (height != null) {
+        child = SizedBox(height: height, child: child);
+      }
     }
 
     if (contentId == null) {
