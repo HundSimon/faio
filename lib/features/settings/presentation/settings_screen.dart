@@ -5,6 +5,7 @@ import '../../../data/e621/e621_auth.dart';
 import '../../../data/pixiv/pixiv_auth.dart';
 import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../core/theme/theme_mode_provider.dart';
+import 'licenses_screen.dart';
 import 'pixiv_login_screen.dart';
 import 'tag_management_screen.dart';
 
@@ -143,6 +144,19 @@ class SettingsScreen extends ConsumerWidget {
             child: ListTile(
               title: Text('网络策略'),
               subtitle: Text('DoH/代理、SNI 防护等功能即将上线'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              title: const Text('开源许可与鸣谢'),
+              subtitle: const Text('查看 GPL 3.0 说明以及 Credits'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LicensesScreen()),
+                );
+              },
             ),
           ),
         ],

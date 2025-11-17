@@ -45,3 +45,13 @@ Pixiv 的图片 CDN 需要 `Referer: https://app-api.pixiv.net/` 头；客户端
 - 完成 AIO 聚合页与漫画/小说详情体验
 - 为 Pixiv API 调用增加容错与本地缓存
 - 针对关键数据层编写单元测试与 Widget 测试
+
+## 协议
+
+faio 以 [GNU GPL 3.0](LICENSE) 授权发布，任何衍生作品必须在同协议下进行分享，并在分发时附带本协议文本。
+
+## 致谢
+
+- [Pixez](https://github.com/Notsfsssf/pixez-flutter)：faio 的 Pixiv 体验灵感与部分实现思路参考自该同为 GPL 3.0 的项目，感谢其开源贡献。
+- [FurryNovel](https://furrynovel.ink)：提供稳定的 Pixiv 小说代理服务，便于在国内环境下访问相关内容。
+- [PixivSource](https://github.com/DowneyRem/PixivSource)：整理了 Pixiv API 以及 FurryNovel API 参考，降低了接入成本。
