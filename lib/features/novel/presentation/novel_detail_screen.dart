@@ -564,7 +564,7 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
         detail.authorName ?? initialContent?.authorName ?? '未知作者';
     final summary = detail.description.isNotEmpty
         ? detail.description
-        : (initialContent?.summary ?? detail.body);
+        : detail.body;
     final tags = detail.tags.isNotEmpty
         ? detail.tags
         : (initialContent?.tags ?? const <ContentTag>[]);
@@ -633,7 +633,9 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
               final statPills = <Widget>[];
               final contentLength = detail.length ?? detail.body.length;
               if (detail.readCount != null && detail.readCount! > 0) {
-                final formattedReadCount = _formatCompactNumber(detail.readCount!);
+                final formattedReadCount = _formatCompactNumber(
+                  detail.readCount!,
+                );
                 statPills.add(
                   _InfoPill(
                     icon: Icons.visibility_outlined,
@@ -738,11 +740,9 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
           pickPrimaryLink(detail.sourceLinks) ??
           pickPrimaryLink(favoriteEntry.sourceLinks) ??
           (detail.source == 'pixiv'
-              ? Uri.https(
-                  'www.pixiv.net',
-                  '/novel/show.php',
-                  {'id': detail.novelId.toString()},
-                )
+              ? Uri.https('www.pixiv.net', '/novel/show.php', {
+                  'id': detail.novelId.toString(),
+                })
               : null);
       return Card(
         margin: EdgeInsets.zero,
@@ -1466,7 +1466,9 @@ String _formatRelativeTime(DateTime dateTime) {
 String _formatCompactNumber(int value) {
   String format(double number) {
     final showDecimal = number < 10 && (number % 1) != 0;
-    final text = showDecimal ? number.toStringAsFixed(1) : number.toStringAsFixed(0);
+    final text = showDecimal
+        ? number.toStringAsFixed(1)
+        : number.toStringAsFixed(0);
     return text.endsWith('.0') ? text.substring(0, text.length - 2) : text;
   }
 

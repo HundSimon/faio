@@ -68,20 +68,39 @@ class NovelMapper {
         novel.coverImageUrls.squareMedium;
 
     final tags = _pixivTags(novel.tags);
+    final body = (() {
+      final text = novel.text?.trim();
+      if (text != null && text.isNotEmpty) {
+        return text;
+      }
+      return summary;
+    })();
+    final description = summary.isNotEmpty ? summary : body;
+
+    NovelSeriesOutline? series;
+    final hasSeriesId = (novel.seriesId ?? 0) > 0;
+    final hasSeriesTitle = (novel.seriesTitle?.trim().isNotEmpty ?? false);
+    if (hasSeriesId || hasSeriesTitle) {
+      series = NovelSeriesOutline(
+        id: novel.seriesId ?? 0,
+        title: novel.seriesTitle?.trim() ?? '',
+      );
+    }
+
     return NovelDetail(
       novelId: novel.id,
       source: 'pixiv',
       title: title,
-      description: summary,
-      body: summary,
+      description: description,
+      body: body,
       authorName: novel.user.name.trim().isNotEmpty
           ? novel.user.name.trim()
           : null,
       authorId: novel.user.id == 0 ? null : novel.user.id,
       tags: tags,
-      series: null,
+      series: series,
       coverUrl: image,
-      length: novel.textLength,
+      length: novel.textLength ?? novel.text?.length,
       createdAt: novel.createDate,
       updatedAt: novel.updateDate,
       images: const {},

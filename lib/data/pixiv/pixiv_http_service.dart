@@ -179,7 +179,30 @@ class PixivHttpService implements PixivService {
     );
     final novel = response['novel'];
     if (novel is Map<String, dynamic>) {
-      return PixivNovel.fromJson(novel);
+      var parsed = PixivNovel.fromJson(novel);
+      if (parsed.text == null || parsed.text!.trim().isEmpty) {
+        try {
+          final text = await _fetchNovelText(novelId);
+          if (text != null && text.trim().isNotEmpty) {
+            parsed = parsed.copyWith(text: text);
+          }
+        } on RhttpStatusCodeException catch (_) {
+          // Ignore fallback failures (e.g. 404) and keep existing data.
+        }
+      }
+      return parsed;
+    }
+    return null;
+  }
+
+  Future<String?> _fetchNovelText(int novelId) async {
+    final response = await _getJson(
+      path: '/v1/novel/text',
+      queryParameters: {'novel_id': novelId},
+    );
+    final text = response['novel_text'];
+    if (text is String && text.isNotEmpty) {
+      return text;
     }
     return null;
   }

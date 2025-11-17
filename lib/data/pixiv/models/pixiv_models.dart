@@ -252,7 +252,9 @@ class PixivNovel {
     required this.totalBookmarks,
     this.coverImageUrls = const PixivImageUrls(),
     this.textLength,
+    this.seriesId,
     this.seriesTitle,
+    this.text,
   });
 
   final int id;
@@ -265,7 +267,41 @@ class PixivNovel {
   final int totalBookmarks;
   final PixivImageUrls coverImageUrls;
   final int? textLength;
+  final int? seriesId;
   final String? seriesTitle;
+  final String? text;
+
+  PixivNovel copyWith({
+    int? id,
+    String? title,
+    String? caption,
+    DateTime? createDate,
+    DateTime? updateDate,
+    PixivUserSummary? user,
+    List<PixivTag>? tags,
+    int? totalBookmarks,
+    PixivImageUrls? coverImageUrls,
+    int? textLength,
+    int? seriesId,
+    String? seriesTitle,
+    String? text,
+  }) {
+    return PixivNovel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      caption: caption ?? this.caption,
+      createDate: createDate ?? this.createDate,
+      updateDate: updateDate ?? this.updateDate,
+      user: user ?? this.user,
+      tags: tags ?? this.tags,
+      totalBookmarks: totalBookmarks ?? this.totalBookmarks,
+      coverImageUrls: coverImageUrls ?? this.coverImageUrls,
+      textLength: textLength ?? this.textLength,
+      seriesId: seriesId ?? this.seriesId,
+      seriesTitle: seriesTitle ?? this.seriesTitle,
+      text: text ?? this.text,
+    );
+  }
 
   factory PixivNovel.fromJson(Map<String, dynamic>? json) {
     if (json == null) {
@@ -302,6 +338,14 @@ class PixivNovel {
       json['image_urls'] as Map<String, dynamic>?,
     );
 
+    final seriesJson = json['series'];
+    int? seriesId;
+    String? seriesTitle;
+    if (seriesJson is Map<String, dynamic>) {
+      seriesId = seriesJson['id'] as int?;
+      seriesTitle = seriesJson['title'] as String?;
+    }
+
     return PixivNovel(
       id: json['id'] as int? ?? 0,
       title: json['title'] as String? ?? '',
@@ -315,8 +359,9 @@ class PixivNovel {
       totalBookmarks: json['total_bookmarks'] as int? ?? 0,
       coverImageUrls: imageUrls,
       textLength: json['text_length'] as int?,
-      seriesTitle:
-          (json['series'] as Map<String, dynamic>?)?['title'] as String?,
+      seriesId: seriesId,
+      seriesTitle: seriesTitle,
+      text: json['text'] as String?,
     );
   }
 }

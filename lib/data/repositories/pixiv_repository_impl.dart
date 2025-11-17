@@ -4,6 +4,7 @@ import '../../domain/models/novel_detail.dart';
 import '../../domain/repositories/pixiv_repository.dart';
 import '../../domain/services/tag_filter.dart';
 import '../furrynovel/furrynovel_service.dart';
+import '../furrynovel/models/furry_novel_models.dart';
 import '../pixiv/models/pixiv_models.dart';
 import '../pixiv/pixiv_service.dart';
 import 'mappers/content_mapper.dart';
@@ -168,7 +169,12 @@ class PixivRepositoryImpl implements PixivRepository {
 
   @override
   Future<NovelDetail?> fetchNovelDetail(int novelId) async {
-    final furryNovel = await _furryNovelService.fetchNovel(novelId);
+    FurryNovel? furryNovel;
+    try {
+      furryNovel = await _furryNovelService.fetchNovel(novelId);
+    } catch (_) {
+      furryNovel = null;
+    }
     if (furryNovel != null) {
       final cachedLikeCount =
           _novelLikeCountCache[furryNovel.id] ?? furryNovel.pixivLikeCount;

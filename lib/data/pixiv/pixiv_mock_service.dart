@@ -311,7 +311,9 @@ List<PixivNovel> _buildNovels() {
         ),
       ),
       textLength: 4500,
+      seriesId: 100,
       seriesTitle: '林海旅记系列',
+      text: '跨越林海的旅人，携手狼人骑士共同探险。',
     ),
   ];
 }
