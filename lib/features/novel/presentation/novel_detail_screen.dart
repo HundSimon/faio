@@ -14,6 +14,7 @@ import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
+import 'package:faio/domain/utils/tag_sorter.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
 import 'package:faio/features/feed/providers/feed_providers.dart';
@@ -479,9 +480,11 @@ class _NovelDetailContent extends ConsumerWidget {
     final summary = detail.description.isNotEmpty
         ? detail.description
         : (initialContent?.summary ?? detail.body);
-    final tags = detail.tags.isNotEmpty
-        ? detail.tags
-        : (initialContent?.tags ?? const <ContentTag>[]);
+    final tags = ContentTagSorter.sort(
+      detail.tags.isNotEmpty
+          ? detail.tags
+          : (initialContent?.tags ?? const <ContentTag>[]),
+    );
     final publishedAt = detail.createdAt ?? initialContent?.publishedAt;
     final favoriteEntry =
         favoriteContent ??

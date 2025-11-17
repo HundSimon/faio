@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
+import 'package:faio/domain/utils/tag_sorter.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
 import 'package:faio/features/tagging/widgets/tag_chip.dart';
@@ -298,6 +299,7 @@ class _IllustrationDetailView extends StatelessWidget {
         content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
     final heroHighRes =
         content.sampleUrl ?? content.originalUrl ?? content.previewUrl;
+    final tags = ContentTagSorter.sort(content.tags);
 
     Widget placeholder(IconData icon) {
       return Container(
@@ -434,7 +436,7 @@ class _IllustrationDetailView extends StatelessWidget {
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: content.tags.map((tag) => TagChip(tag: tag)).toList(),
+          children: tags.map((tag) => TagChip(tag: tag)).toList(),
         ),
       );
     }
@@ -496,7 +498,7 @@ class _IllustrationDetailView extends StatelessWidget {
         buildMetaCard(),
         const SizedBox(height: 20),
         buildSummaryCard(),
-        if (content.tags.isNotEmpty) ...[
+        if (tags.isNotEmpty) ...[
           const SizedBox(height: 20),
           buildTagsCard(),
         ],
