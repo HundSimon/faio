@@ -149,7 +149,7 @@ class PixivRepositoryImpl implements PixivRepository {
     }
 
     final results = await Future.wait(futures);
-    final combined = results.expand((list) => list).toList()
+    final combined = _dedupeNovels(results.expand((list) => list))
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
     if (combined.length > limit) {
       return combined.sublist(0, limit);
@@ -211,6 +211,26 @@ class PixivRepositoryImpl implements PixivRepository {
         .whereType<FaioContent>()
         .toList();
     return _filterItems(rawItems);
+  }
+
+  List<FaioContent> _dedupeNovels(Iterable<FaioContent> items) {
+    final deduped = <FaioContent>[];
+    final seenKeys = <String>{};
+    for (final item in items) {
+      final key = item.type == ContentType.novel ? _novelKey(item.id) : item.id;
+      if (seenKeys.add(key)) {
+        deduped.add(item);
+      }
+    }
+    return deduped;
+  }
+
+  String _novelKey(String id) {
+    final separatorIndex = id.lastIndexOf(':');
+    if (separatorIndex == -1 || separatorIndex == id.length - 1) {
+      return 'novel:$id';
+    }
+    return 'novel:${id.substring(separatorIndex + 1)}';
   }
 
   int _offsetForPage(int page, int limit) {

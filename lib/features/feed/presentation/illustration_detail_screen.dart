@@ -56,11 +56,13 @@ class IllustrationDetailRouteArgs {
     required this.source,
     required this.initialIndex,
     this.skipInitialWarningPrompt = false,
+    this.initialContent,
   });
 
   final IllustrationSource source;
   final int initialIndex;
   final bool skipInitialWarningPrompt;
+  final FaioContent? initialContent;
 }
 
 class IllustrationDetailScreen extends ConsumerStatefulWidget {
@@ -68,12 +70,14 @@ class IllustrationDetailScreen extends ConsumerStatefulWidget {
     required this.source,
     required this.initialIndex,
     this.skipInitialWarningPrompt = false,
+    this.initialContent,
     super.key,
   });
 
   final IllustrationSource source;
   final int initialIndex;
   final bool skipInitialWarningPrompt;
+  final FaioContent? initialContent;
 
   @override
   ConsumerState<IllustrationDetailScreen> createState() =>
@@ -194,8 +198,45 @@ class _IllustrationDetailScreenState
           .toSet(),
       orElse: () => <String>{},
     );
-
     final items = feedState.items;
+    final fallbackContent = widget.initialContent;
+
+    final shouldShowFallback =
+        fallbackContent != null &&
+        (items.isEmpty || !items.any((item) => item.id == fallbackContent.id));
+
+    if (shouldShowFallback) {
+      _recordView(fallbackContent);
+      final isFavorite = favoriteIds.contains(fallbackContent.id);
+      final shouldSkipWarning = widget.skipInitialWarningPrompt;
+      return Scaffold(
+        appBar: AppBar(
+          leading: BackButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          title: Text(
+            fallbackContent.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        body: _IllustrationDetailView(
+          key: ValueKey(fallbackContent.id),
+          content: fallbackContent,
+          isFavorite: isFavorite,
+          onToggleFavorite: () {
+            ref
+                .read(libraryFavoritesProvider.notifier)
+                .toggleContentFavorite(fallbackContent);
+          },
+          onOpenSource: (url) => _openSourceLink(context, url),
+          primaryLink: _primarySourceLink(fallbackContent),
+          safetySettings: ref.watch(contentSafetySettingsProvider),
+          skipWarningPrompt: shouldSkipWarning,
+        ),
+      );
+    }
+
     if (items.isEmpty && feedState.isLoadingInitial) {
       return Scaffold(
         appBar: AppBar(),

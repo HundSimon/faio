@@ -93,6 +93,7 @@ final appRouterProvider = Provider<GoRouter>(
                           initialIndex: args.initialIndex,
                           skipInitialWarningPrompt:
                               args.skipInitialWarningPrompt,
+                          initialContent: args.initialContent,
                         ),
                         transitionsBuilder: _detailPageTransitionBuilder,
                       );
