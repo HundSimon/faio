@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/preferences/content_safety_settings.dart';
 import '../../../data/e621/e621_auth.dart';
 import '../../../data/pixiv/pixiv_auth.dart';
 import '../../../data/pixiv/pixiv_providers.dart';
@@ -19,6 +20,7 @@ class SettingsScreen extends ConsumerWidget {
     final pixivCredentials = ref.watch(pixivAuthProvider);
     final themeMode = ref.watch(themeModeProvider);
     final theme = Theme.of(context);
+    final contentSafety = ref.watch(contentSafetySettingsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -137,6 +139,46 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 );
               },
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '成人内容',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '选择在信息流中如何处理 R-18 / R-18G 作品。模糊状态下点击仍会提示确认。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _VisibilitySelector(
+                    title: 'R-18 成人内容',
+                    value: contentSafety.adultVisibility,
+                    onChanged: (value) => ref
+                        .read(contentSafetySettingsProvider.notifier)
+                        .setAdultVisibility(value),
+                  ),
+                  const SizedBox(height: 16),
+                  _VisibilitySelector(
+                    title: 'R-18G 重口内容',
+                    value: contentSafety.extremeVisibility,
+                    onChanged: (value) => ref
+                        .read(contentSafetySettingsProvider.notifier)
+                        .setExtremeVisibility(value),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -268,6 +310,53 @@ class SettingsScreen extends ConsumerWidget {
       case _CredentialDialogAction.cancel:
         break;
     }
+  }
+}
+
+class _VisibilitySelector extends StatelessWidget {
+  const _VisibilitySelector({
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final ContentVisibility value;
+  final ValueChanged<ContentVisibility> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const segments = [
+      ButtonSegment<ContentVisibility>(
+        value: ContentVisibility.hide,
+        label: Text('隐藏'),
+      ),
+      ButtonSegment<ContentVisibility>(
+        value: ContentVisibility.blur,
+        label: Text('模糊'),
+      ),
+      ButtonSegment<ContentVisibility>(
+        value: ContentVisibility.show,
+        label: Text('直接显示'),
+      ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        SegmentedButton<ContentVisibility>(
+          segments: segments,
+          selected: {value},
+          showSelectedIcon: false,
+          onSelectionChanged: (selection) {
+            if (selection.isNotEmpty) {
+              onChanged(selection.first);
+            }
+          },
+        ),
+      ],
+    );
   }
 }
 

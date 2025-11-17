@@ -1,21 +1,28 @@
 import 'dart:math' as math;
 
 import 'package:animations/animations.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:faio/core/preferences/content_safety_settings.dart';
 import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
-import 'package:faio/domain/utils/tag_sorter.dart';
+import 'package:faio/features/common/utils/content_warning.dart';
+import 'package:faio/features/common/widgets/categorized_tags.dart';
+import 'package:faio/features/common/widgets/content_warning_banner.dart';
+import 'package:faio/features/common/widgets/detail_info_row.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
+import 'package:faio/features/common/widgets/summary_placeholder.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
-import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../providers/feed_providers.dart';
 import 'illustration_hero.dart';
+import 'widgets/progressive_illustration_image.dart';
 
 Uri? _primarySourceLink(FaioContent content) {
   if (content.originalUrl != null) {
@@ -127,7 +134,7 @@ class _IllustrationDetailScreenState
 
   Future<void> _openSourceLink(BuildContext context, Uri url) async {
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('无法打开链接：${url.host}')));
@@ -249,6 +256,7 @@ class _IllustrationDetailScreenState
               },
               onOpenSource: (url) => _openSourceLink(context, url),
               primaryLink: _primarySourceLink(content),
+              safetySettings: ref.watch(contentSafetySettingsProvider),
             );
           },
         ),
@@ -257,24 +265,7 @@ class _IllustrationDetailScreenState
   }
 }
 
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Chip(
-      avatar: Icon(icon, size: 16),
-      label: Text(label),
-      backgroundColor: theme.colorScheme.surfaceContainerHighest,
-    );
-  }
-}
-
-class _IllustrationDetailView extends StatelessWidget {
+class _IllustrationDetailView extends StatefulWidget {
   const _IllustrationDetailView({
     super.key,
     required this.content,
@@ -282,6 +273,7 @@ class _IllustrationDetailView extends StatelessWidget {
     required this.onToggleFavorite,
     required this.onOpenSource,
     required this.primaryLink,
+    required this.safetySettings,
   });
 
   final FaioContent content;
@@ -289,195 +281,119 @@ class _IllustrationDetailView extends StatelessWidget {
   final VoidCallback onToggleFavorite;
   final void Function(Uri url) onOpenSource;
   final Uri? primaryLink;
+  final ContentSafetySettings safetySettings;
+
+  @override
+  State<_IllustrationDetailView> createState() =>
+      _IllustrationDetailViewState();
+}
+
+class _IllustrationDetailViewState extends State<_IllustrationDetailView>
+    with SingleTickerProviderStateMixin {
+  late final ContentWarning? _warning;
+  late bool _warningAcknowledged;
+  late final AnimationController _favoriteBurstController;
+  late final Animation<double> _burstOpacity;
+  late final Animation<double> _burstScale;
+  var _isSavingImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _warning = evaluateContentWarning(
+      rating: widget.content.rating,
+      tags: widget.content.tags,
+    );
+    _warningAcknowledged = widget.safetySettings.isAutoApproved(
+      _warning?.level,
+    );
+    _favoriteBurstController = AnimationController(
+      duration: const Duration(milliseconds: 420),
+      vsync: this,
+    );
+    _burstOpacity = CurvedAnimation(
+      parent: _favoriteBurstController,
+      curve: const Interval(0, 0.8, curve: Curves.easeOut),
+    );
+    _burstScale = Tween<double>(begin: 0.6, end: 1.2).animate(
+      CurvedAnimation(
+        parent: _favoriteBurstController,
+        curve: Curves.elasticOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _favoriteBurstController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _IllustrationDetailView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.safetySettings != widget.safetySettings) {
+      final allowed = widget.safetySettings.isAutoApproved(_warning?.level);
+      if (allowed != _warningAcknowledged) {
+        setState(() {
+          _warningAcknowledged = allowed;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final content = widget.content;
     final aspectRatio = (content.previewAspectRatio ?? 1).clamp(0.4, 1.8);
-    final hasSummary = content.summary.trim().isNotEmpty;
     final heroPreview =
         content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
     final heroHighRes =
         content.sampleUrl ?? content.originalUrl ?? content.previewUrl;
-    final tags = ContentTagSorter.sort(content.tags);
+    final hasSummary = content.summary.trim().isNotEmpty;
+    final warning = _warning;
+    final isBlocked = widget.safetySettings.isBlocked(warning?.level);
+    final shouldGate =
+        warning?.requiresConfirmation == true && !_warningAcknowledged;
 
-    Widget placeholder(IconData icon) {
-      return Container(
-        height: 280,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 48),
-      );
-    }
-
-    Widget buildHero() {
-      if (heroPreview == null && heroHighRes == null) {
-        return placeholder(Icons.image);
-      }
-      final heroChild = OpenContainer(
-        closedElevation: 0,
-        openElevation: 0,
-        closedColor: Colors.transparent,
-        openColor: Colors.black,
-        transitionDuration: const Duration(milliseconds: 420),
-        transitionType: ContainerTransitionType.fadeThrough,
-        closedShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
-        tappable: false,
-        openBuilder: (context, _) =>
-            _IllustrationFullscreenView(content: content),
-        closedBuilder: (context, openContainer) {
-          return InkWell(
-            onTap: openContainer,
-            borderRadius: BorderRadius.circular(28),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: AspectRatio(
-                aspectRatio: aspectRatio > 0 ? aspectRatio : 1,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _ProgressiveIllustrationImage(
-                      content: content,
-                      lowRes: heroPreview,
-                      highRes: heroHighRes,
-                      fit: BoxFit.cover,
-                    ),
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withOpacity(0.4),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+    if (isBlocked && warning != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.visibility_off_outlined,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 48,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${warning.label} 内容已被屏蔽',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          );
-        },
-      );
-
-      return Hero(
-        tag: illustrationHeroTag(content.id),
-        transitionOnUserGestures: true,
-        createRectTween: illustrationHeroRectTween,
-        child: heroChild,
-      );
-    }
-
-    Widget buildPrimaryActions() {
-      final baseCount = content.favoriteCount;
-      final displayCount = baseCount + (isFavorite ? 1 : 0);
-      final favoriteLabelBase = isFavorite ? '已收藏' : '收藏';
-      final favoriteLabel = '$favoriteLabelBase（$displayCount）';
-      return Row(
-        children: [
-          Expanded(
-            child: FilledButton.icon(
-              icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-              label: Text(favoriteLabel),
-              onPressed: onToggleFavorite,
-            ),
-          ),
-        ],
-      );
-    }
-
-    Widget buildMetaCard() {
-      final chips = <Widget>[
-        if (content.rating.isNotEmpty)
-          _MetaChip(icon: Icons.shield, label: '评级 ${content.rating}'),
-        _MetaChip(
-          icon: Icons.schedule,
-          label: '发布 ${_formatDateTime(content.publishedAt)}',
-        ),
-        _MetaChip(
-          icon: Icons.update,
-          label: '更新 ${_formatDateTime(content.updatedAt)}',
-        ),
-        _MetaChip(
-          icon: Icons.people_alt_outlined,
-          label: content.authorName?.isNotEmpty == true
-              ? content.authorName!
-              : '匿名作者',
-        ),
-      ];
-      return DetailSectionCard(
-        title: '作品信息',
-        child: Wrap(spacing: 8, runSpacing: 8, children: chips),
-      );
-    }
-
-    Widget buildSummaryCard() {
-      return DetailSectionCard(
-        title: '简介',
-        child: SelectableText(
-          hasSummary ? content.summary : '暂无简介',
-          style: theme.textTheme.bodyMedium,
-        ),
-      );
-    }
-
-    Widget buildTagsCard() {
-      return DetailSectionCard(
-        title: '标签',
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: tags.map((tag) => TagChip(tag: tag)).toList(),
-        ),
-      );
-    }
-
-    Widget buildSourceCard() {
-      if (content.sourceLinks.isEmpty) {
-        return const SizedBox.shrink();
-      }
-      return DetailSectionCard(
-        title: '来源链接',
-        child: Column(
-          children: [
-            for (var i = 0; i < content.sourceLinks.length; i++) ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text(
-                  content.sourceLinks[i].host,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              const SizedBox(height: 8),
+              Text(
+                '可在设置中允许显示该分级后重新查看。',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-                subtitle: Text(
-                  content.sourceLinks[i].toString(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: const Icon(Icons.open_in_new),
-                onTap: () => onOpenSource(content.sourceLinks[i]),
               ),
-              if (i < content.sourceLinks.length - 1) const Divider(height: 12),
             ],
-          ],
+          ),
         ),
       );
     }
 
-    return ListView(
+    final body = ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
-        buildHero(),
+        _buildHero(context, aspectRatio, heroPreview, heroHighRes),
         const SizedBox(height: 20),
         Text(
           content.title,
@@ -492,111 +408,459 @@ class _IllustrationDetailView extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 20),
-        buildPrimaryActions(),
-        const SizedBox(height: 20),
-        buildMetaCard(),
-        const SizedBox(height: 20),
-        buildSummaryCard(),
-        if (tags.isNotEmpty) ...[
+        if (warning != null) ...[
           const SizedBox(height: 20),
-          buildTagsCard(),
+          ContentWarningBanner(warning: warning),
+        ],
+        const SizedBox(height: 20),
+        _buildPrimaryActions(context),
+        const SizedBox(height: 20),
+        _buildMetaCard(context),
+        const SizedBox(height: 20),
+        _buildSummaryCard(context, hasSummary),
+        if (content.tags.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _buildTagsCard(),
         ],
         if (content.sourceLinks.isNotEmpty) ...[
           const SizedBox(height: 20),
-          buildSourceCard(),
+          _buildSourceCard(context),
+        ],
+      ],
+    );
+
+    return Stack(
+      children: [
+        body,
+        if (shouldGate && warning != null)
+          Positioned.fill(
+            child: ContentWarningOverlay(
+              warning: warning,
+              onConfirm: () => setState(() => _warningAcknowledged = true),
+              onDismiss: () {
+                Navigator.of(context).maybePop();
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildHero(
+    BuildContext context,
+    double aspectRatio,
+    Uri? heroPreview,
+    Uri? heroHighRes,
+  ) {
+    final theme = Theme.of(context);
+    if (heroPreview == null && heroHighRes == null) {
+      return Container(
+        height: 280,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Icon(
+          Icons.image,
+          color: theme.colorScheme.onSurfaceVariant,
+          size: 48,
+        ),
+      );
+    }
+    final content = widget.content;
+    final heroChild = OpenContainer(
+      closedElevation: 0,
+      openElevation: 0,
+      closedColor: Colors.transparent,
+      openColor: Colors.black,
+      transitionDuration: const Duration(milliseconds: 420),
+      transitionType: ContainerTransitionType.fadeThrough,
+      closedShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+      ),
+      tappable: false,
+      openBuilder: (context, _) =>
+          _IllustrationFullscreenView(content: widget.content),
+      closedBuilder: (context, openContainer) {
+        return GestureDetector(
+          onTap: openContainer,
+          onDoubleTap: _handleDoubleTapFavorite,
+          onLongPress: () => _handleLongPressHero(context),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: AspectRatio(
+              aspectRatio: aspectRatio > 0 ? aspectRatio : 1,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ProgressiveIllustrationImage(
+                    content: content,
+                    lowRes: heroPreview,
+                    highRes: heroHighRes,
+                    fit: BoxFit.cover,
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Colors.black.withOpacity(0.45),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: FadeTransition(
+                        opacity: _burstOpacity,
+                        child: ScaleTransition(
+                          scale: _burstScale,
+                          child: const Icon(
+                            Icons.favorite,
+                            color: Colors.white,
+                            size: 96,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_isSavingImage)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              '保存中…',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return Hero(
+      tag: illustrationHeroTag(content.id),
+      transitionOnUserGestures: true,
+      createRectTween: illustrationHeroRectTween,
+      child: heroChild,
+    );
+  }
+
+  Widget _buildPrimaryActions(BuildContext context) {
+    final baseCount = widget.content.favoriteCount;
+    final displayCount = baseCount + (widget.isFavorite ? 1 : 0);
+    final favoriteLabel = '${widget.isFavorite ? '已收藏' : '收藏'}（$displayCount）';
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            ),
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (child, animation) =>
+                  ScaleTransition(scale: animation, child: child),
+              child: Icon(
+                widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                key: ValueKey(widget.isFavorite),
+              ),
+            ),
+            label: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Text(favoriteLabel, key: ValueKey(favoriteLabel)),
+            ),
+            onPressed: () {
+              widget.onToggleFavorite();
+              _favoriteBurstController.forward(from: 0);
+            },
+          ),
+        ),
+        if (widget.primaryLink != null) ...[
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('查看原站'),
+            onPressed: () => widget.onOpenSource(widget.primaryLink!),
+          ),
         ],
       ],
     );
   }
-}
 
-class _ProgressiveIllustrationImage extends StatefulWidget {
-  const _ProgressiveIllustrationImage({
-    required this.content,
-    this.lowRes,
-    this.highRes,
-    this.fit = BoxFit.cover,
-  });
+  Widget _buildMetaCard(BuildContext context) {
+    final content = widget.content;
+    final published = _formatDateTime(content.publishedAt);
+    final updated = content.updatedAt != null
+        ? _formatDateTime(content.updatedAt)
+        : null;
+    final rating = content.rating.isNotEmpty ? content.rating : '未评级';
+    final author = content.authorName?.isNotEmpty == true
+        ? content.authorName!
+        : '匿名作者';
 
-  final FaioContent content;
-  final Uri? lowRes;
-  final Uri? highRes;
-  final BoxFit fit;
+    return DetailSectionCard(
+      title: '作品信息',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DetailInfoRow(icon: Icons.person_outline, label: '作者', value: author),
+          const SizedBox(height: 12),
+          DetailInfoRow(icon: Icons.schedule, label: '发布时间', value: published),
+          if (updated != null) ...[
+            const SizedBox(height: 8),
+            DetailInfoRow(
+              icon: Icons.update,
+              label: '最近更新',
+              value: updated,
+              subtle: true,
+            ),
+          ],
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoBadge(icon: Icons.shield, label: '评级 $rating'),
+              _InfoBadge(
+                icon: Icons.favorite,
+                label: '收藏 ${content.favoriteCount}',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  State<_ProgressiveIllustrationImage> createState() =>
-      _ProgressiveIllustrationImageState();
-}
+  Widget _buildSummaryCard(BuildContext context, bool hasSummary) {
+    final theme = Theme.of(context);
+    return DetailSectionCard(
+      title: '简介',
+      child: hasSummary
+          ? SelectableText(
+              widget.content.summary,
+              style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
+            )
+          : SummaryPlaceholder(
+              onAction: widget.primaryLink == null
+                  ? null
+                  : () => widget.onOpenSource(widget.primaryLink!),
+              actionLabel: widget.primaryLink == null ? null : '前往原站填写',
+            ),
+    );
+  }
 
-class _ProgressiveIllustrationImageState
-    extends State<_ProgressiveIllustrationImage> {
-  bool _highResLoaded = false;
+  Widget _buildTagsCard() {
+    return DetailSectionCard(
+      title: '标签',
+      child: CategorizedTagList(tags: widget.content.tags),
+    );
+  }
 
-  @override
-  void didUpdateWidget(covariant _ProgressiveIllustrationImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.highRes?.toString() != oldWidget.highRes?.toString()) {
-      _highResLoaded = false;
+  Widget _buildSourceCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return DetailSectionCard(
+      title: '来源链接',
+      child: Column(
+        children: [
+          for (var i = 0; i < widget.content.sourceLinks.length; i++) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(
+                widget.content.sourceLinks[i].host,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                widget.content.sourceLinks[i].toString(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => widget.onOpenSource(widget.content.sourceLinks[i]),
+            ),
+            if (i < widget.content.sourceLinks.length - 1)
+              const Divider(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _handleDoubleTapFavorite() {
+    widget.onToggleFavorite();
+    _favoriteBurstController.forward(from: 0);
+  }
+
+  Future<void> _handleLongPressHero(BuildContext context) async {
+    final action = await showModalBottomSheet<_HeroAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('保存图片到相册'),
+                onTap: () => Navigator.of(sheetContext).pop(_HeroAction.save),
+              ),
+              if (widget.primaryLink != null)
+                ListTile(
+                  leading: const Icon(Icons.link_outlined),
+                  title: const Text('复制原站链接'),
+                  onTap: () =>
+                      Navigator.of(sheetContext).pop(_HeroAction.copyLink),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!context.mounted || action == null) {
+      return;
+    }
+    if (action == _HeroAction.save) {
+      await _saveIllustration(context);
+    } else if (action == _HeroAction.copyLink && widget.primaryLink != null) {
+      await Clipboard.setData(
+        ClipboardData(text: widget.primaryLink.toString()),
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('已复制来源链接')));
     }
   }
+
+  Future<void> _saveIllustration(BuildContext context) async {
+    if (_isSavingImage) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final imageUrl =
+        widget.content.originalUrl ??
+        widget.content.sampleUrl ??
+        widget.content.previewUrl;
+    if (imageUrl == null) {
+      messenger?.showSnackBar(const SnackBar(content: Text('暂无可保存的图片')));
+      return;
+    }
+    setState(() => _isSavingImage = true);
+    try {
+      final headers = pixivImageHeaders(content: widget.content, url: imageUrl);
+      final cacheManager =
+          pixivImageCacheManagerForUrl(imageUrl) ?? DefaultCacheManager();
+      final file = await cacheManager.getSingleFile(
+        imageUrl.toString(),
+        headers: headers ?? const <String, String>{},
+      );
+      final bytes = await file.readAsBytes();
+      final result = await ImageGallerySaver.saveImage(
+        Uint8List.fromList(bytes),
+        quality: 100,
+        name: 'faio_${widget.content.id.replaceAll(':', '_')}',
+      );
+      final success = _isSaveSuccessful(result);
+      messenger?.showSnackBar(
+        SnackBar(content: Text(success ? '已保存到相册' : '保存失败，请稍后重试')),
+      );
+    } catch (error) {
+      messenger?.showSnackBar(SnackBar(content: Text('保存失败：$error')));
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingImage = false);
+      }
+    }
+  }
+
+  bool _isSaveSuccessful(dynamic result) {
+    if (result is bool) {
+      return result;
+    }
+    if (result is Map) {
+      final success = result['isSuccess'];
+      if (success is bool) {
+        return success;
+      }
+    }
+    return false;
+  }
+}
+
+class _InfoBadge extends StatelessWidget {
+  const _InfoBadge({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = Theme.of(
-      context,
-    ).colorScheme.surfaceContainerHighest;
-    final layers = <Widget>[
-      Positioned.fill(
-        child: widget.lowRes != null
-            ? Image(
-                image: CachedNetworkImageProvider(
-                  widget.lowRes.toString(),
-                  headers: pixivImageHeaders(content: widget.content),
-                  cacheManager: pixivImageCacheManagerForUrl(widget.lowRes),
-                ),
-                fit: widget.fit,
-                alignment: Alignment.center,
-                errorBuilder: (_, __, ___) => Container(color: backgroundColor),
-              )
-            : Container(color: backgroundColor),
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
       ),
-    ];
-
-    if (widget.highRes != null) {
-      layers.add(
-        Positioned.fill(
-          child: AnimatedOpacity(
-            opacity: _highResLoaded ? 1 : 0,
-            duration: const Duration(milliseconds: 320),
-            child: Image(
-              image: CachedNetworkImageProvider(
-                widget.highRes.toString(),
-                headers: pixivImageHeaders(content: widget.content),
-                cacheManager: pixivImageCacheManagerForUrl(widget.highRes),
-              ),
-              fit: widget.fit,
-              alignment: Alignment.center,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null && !_highResLoaded) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() => _highResLoaded = true);
-                    }
-                  });
-                }
-                return child;
-              },
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-      );
-    }
-
-    return Stack(fit: StackFit.expand, children: layers);
+        ],
+      ),
+    );
   }
 }
+
+enum _HeroAction { save, copyLink }
 
 class _IllustrationFullscreenView extends StatelessWidget {
   const _IllustrationFullscreenView({required this.content});
@@ -617,7 +881,7 @@ class _IllustrationFullscreenView extends StatelessWidget {
             child: InteractiveViewer(
               minScale: 1,
               maxScale: 4,
-              child: _ProgressiveIllustrationImage(
+              child: ProgressiveIllustrationImage(
                 content: content,
                 lowRes: preview,
                 highRes: highRes,

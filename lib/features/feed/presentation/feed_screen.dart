@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,11 +7,13 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
-import 'package:faio/data/pixiv/pixiv_image_cache.dart';
+import 'package:faio/core/preferences/content_safety_settings.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/models/content_tag.dart';
 import 'package:faio/domain/utils/content_id.dart';
-import 'package:faio/domain/utils/pixiv_image_utils.dart';
+import 'package:faio/features/common/utils/content_gate.dart';
+import 'package:faio/features/common/utils/content_warning.dart';
+import 'package:faio/features/common/widgets/blurred_gate_overlay.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
 import 'package:faio/features/novel/presentation/novel_detail_screen.dart'
     show NovelDetailRouteExtra;
@@ -22,72 +23,9 @@ import 'package:faio/features/novel/providers/novel_providers.dart'
 import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../providers/feed_providers.dart';
-import 'illustration_hero.dart';
 import 'illustration_detail_screen.dart' show IllustrationDetailRouteArgs;
-
-class _ResilientNetworkImage extends StatefulWidget {
-  const _ResilientNetworkImage({
-    required this.urls,
-    this.headers,
-    this.fit = BoxFit.cover,
-    this.errorBuilder,
-    this.placeholder,
-  }) : assert(urls.length > 0, 'urls must not be empty');
-
-  final List<Uri> urls;
-  final Map<String, String>? headers;
-  final BoxFit fit;
-  final Widget Function(BuildContext, Object, StackTrace?)? errorBuilder;
-  final Widget? placeholder;
-
-  @override
-  State<_ResilientNetworkImage> createState() => _ResilientNetworkImageState();
-}
-
-class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
-  var _index = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final currentUri = widget.urls[_index];
-    final cacheManager = pixivImageCacheManagerForUrl(currentUri);
-    final currentUrl = currentUri.toString();
-    final imageProvider = CachedNetworkImageProvider(
-      currentUrl,
-      headers: widget.headers,
-      cacheManager: cacheManager,
-    );
-    return Image(
-      image: imageProvider,
-      fit: widget.fit,
-      alignment: Alignment.center,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) {
-          return child;
-        }
-        return widget.placeholder ?? child;
-      },
-      errorBuilder: (context, error, stackTrace) {
-        if (_index < widget.urls.length - 1) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) {
-              return;
-            }
-            setState(() {
-              _index += 1;
-            });
-          });
-          return const SizedBox.expand();
-        }
-        final builder = widget.errorBuilder;
-        if (builder != null) {
-          return builder(context, error, stackTrace);
-        }
-        return const SizedBox.expand();
-      },
-    );
-  }
-}
+import 'illustration_hero.dart';
+import 'widgets/progressive_illustration_image.dart';
 
 Future<void> _showAllTags(BuildContext context, List<ContentTag> tags) async {
   if (tags.isEmpty) {
@@ -941,11 +879,31 @@ class _IllustrationTile extends ConsumerWidget {
       0.5,
       1.8,
     )).toDouble();
+    final safetySettings = ref.watch(contentSafetySettingsProvider);
+    final warning = evaluateContentWarning(
+      rating: item.rating,
+      tags: item.tags,
+    );
+    final gate = evaluateContentGate(warning, safetySettings);
+    final blurLabel = warning?.label ?? 'R-18';
+    if (gate.isBlocked) {
+      return const SizedBox.shrink();
+    }
     return AspectRatio(
       aspectRatio: aspectRatio,
       child: _ContentTile(
         item: item,
-        onTap: () {
+        blurLabel: gate.requiresPrompt ? blurLabel : null,
+        onTap: () async {
+          final allowed = await ensureContentAllowed(
+            context: context,
+            ref: ref,
+            gate: gate,
+          );
+          if (!allowed) {
+            return;
+          }
+          if (!context.mounted) return;
           ref.read(feedSelectionProvider.notifier).select(source, index);
           context.push(
             '/feed/detail',
@@ -1034,7 +992,6 @@ class _NovelListItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final previewUrl = item.previewUrl ?? item.sampleUrl;
     final aspectRatio = ((item.previewAspectRatio ?? 1.4).clamp(
       0.2,
       5.0,
@@ -1094,42 +1051,51 @@ class _NovelListItem extends ConsumerWidget {
         ContentTag.fromLabels(primary: 'R-18'),
       ...standardTags,
     ];
+    final safetySettings = ref.watch(contentSafetySettingsProvider);
+    final warning = evaluateContentWarning(
+      rating: item.rating,
+      tags: item.tags,
+    );
+    final gate = evaluateContentGate(warning, safetySettings);
+    final blurLabel = warning?.label ?? 'R-18';
+    if (gate.isBlocked) {
+      return const SizedBox.shrink();
+    }
 
     Widget buildImage() {
       final borderRadius = BorderRadius.circular(12);
-      Widget child;
-      if (previewUrl == null) {
-        child = ClipRRect(
-          borderRadius: borderRadius,
-          child: Container(
-            color: theme.colorScheme.surfaceContainerHighest,
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.menu_book,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+      Widget base;
+      final lowRes = item.previewUrl ?? item.sampleUrl ?? item.originalUrl;
+      final highRes = item.sampleUrl ?? item.originalUrl;
+      if (lowRes == null && highRes == null) {
+        base = Container(
+          color: theme.colorScheme.surfaceContainerHighest,
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.menu_book,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         );
       } else {
-        final urls = pixivImageUrlCandidates(previewUrl);
-        final headers = pixivImageHeaders(content: item, url: previewUrl);
-        child = ClipRRect(
-          borderRadius: borderRadius,
-          child: _ResilientNetworkImage(
-            urls: urls,
-            headers: headers,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: theme.colorScheme.surfaceContainerHighest,
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.broken_image,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+        base = ProgressiveIllustrationImage(
+          content: item,
+          lowRes: lowRes,
+          highRes: highRes,
+          fit: BoxFit.cover,
         );
       }
+
+      Widget child;
+      if (gate.requiresPrompt) {
+        child = BlurredGateOverlay(
+          label: blurLabel,
+          borderRadius: borderRadius,
+          child: base,
+        );
+      } else {
+        child = ClipRRect(borderRadius: borderRadius, child: base);
+      }
+
       return Hero(
         tag: novelHeroTag(item.id),
         transitionOnUserGestures: true,
@@ -1146,7 +1112,16 @@ class _NovelListItem extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () {
+        onTap: () async {
+          final allowed = await ensureContentAllowed(
+            context: context,
+            ref: ref,
+            gate: gate,
+          );
+          if (!allowed) {
+            return;
+          }
+          if (!context.mounted) return;
           ref.read(novelFeedSelectionProvider.notifier).select(index);
           final novelId = parseContentNumericId(item);
           if (novelId == null) {
@@ -1431,15 +1406,17 @@ class _NovelListSkeletonItem extends StatelessWidget {
 }
 
 class _ContentTile extends StatelessWidget {
-  const _ContentTile({required this.item, this.onTap});
+  const _ContentTile({required this.item, this.onTap, this.blurLabel});
 
   final FaioContent item;
   final VoidCallback? onTap;
+  final String? blurLabel;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final preview = item.previewUrl ?? item.sampleUrl;
+    final lowRes = item.previewUrl ?? item.sampleUrl ?? item.originalUrl;
+    final highRes = item.sampleUrl ?? item.originalUrl;
     Widget placeholder({IconData? icon}) {
       return Container(
         color: theme.colorScheme.surfaceContainerHighest,
@@ -1450,7 +1427,30 @@ class _ContentTile extends StatelessWidget {
       );
     }
 
-    final loadingPlaceholder = placeholder();
+    Widget child;
+    if (lowRes != null || highRes != null) {
+      child = DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+        ),
+        child: ProgressiveIllustrationImage(
+          content: item,
+          lowRes: lowRes,
+          highRes: highRes,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else {
+      child = placeholder(icon: Icons.image);
+    }
+    if (blurLabel != null) {
+      child = BlurredGateOverlay(
+        label: blurLabel!,
+        borderRadius: BorderRadius.circular(12),
+        child: child,
+      );
+    }
+
     return Hero(
       tag: illustrationHeroTag(item.id),
       transitionOnUserGestures: true,
@@ -1459,19 +1459,7 @@ class _ContentTile extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: preview != null
-              ? _ResilientNetworkImage(
-                  urls: pixivImageUrlCandidates(preview),
-                  headers: pixivImageHeaders(content: item, url: preview),
-                  fit: BoxFit.cover,
-                  placeholder: loadingPlaceholder,
-                  errorBuilder: (_, __, ___) =>
-                      placeholder(icon: Icons.broken_image),
-                )
-              : placeholder(icon: Icons.image),
-        ),
+        child: InkWell(onTap: onTap, child: child),
       ),
     );
   }

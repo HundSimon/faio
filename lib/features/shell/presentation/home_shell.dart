@@ -40,36 +40,124 @@ class HomeShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hideNavBar = _isNavHiddenRoute(currentState.uri.toString());
+    final destinations = _navDestinations;
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: hideNavBar
           ? null
-          : NavigationBar(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: _onDestinationSelected,
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.view_agenda_outlined),
-                  selectedIcon: Icon(Icons.view_agenda),
-                  label: '信息流',
+          : Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: List.generate(destinations.length, (index) {
+                    final data = destinations[index];
+                    final selected = navigationShell.currentIndex == index;
+                    return Expanded(
+                      child: _BottomNavItem(
+                        data: data,
+                        selected: selected,
+                        onTap: () => _onDestinationSelected(index),
+                      ),
+                    );
+                  }),
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.search_outlined),
-                  selectedIcon: Icon(Icons.search),
-                  label: '搜索',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.collections_bookmark_outlined),
-                  selectedIcon: Icon(Icons.collections_bookmark),
-                  label: '库',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings),
-                  label: '设置',
-                ),
-              ],
+              ),
             ),
+    );
+  }
+}
+
+class _NavDestinationData {
+  const _NavDestinationData({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+  });
+
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+}
+
+const _navDestinations = <_NavDestinationData>[
+  _NavDestinationData(
+    label: '信息流',
+    icon: Icons.view_agenda_outlined,
+    selectedIcon: Icons.view_agenda,
+  ),
+  _NavDestinationData(
+    label: '搜索',
+    icon: Icons.search_outlined,
+    selectedIcon: Icons.search,
+  ),
+  _NavDestinationData(
+    label: '库',
+    icon: Icons.collections_bookmark_outlined,
+    selectedIcon: Icons.collections_bookmark,
+  ),
+  _NavDestinationData(
+    label: '设置',
+    icon: Icons.settings_outlined,
+    selectedIcon: Icons.settings,
+  ),
+];
+
+class _BottomNavItem extends StatelessWidget {
+  const _BottomNavItem({
+    required this.data,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _NavDestinationData data;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(selected ? data.selectedIcon : data.icon, color: color),
+            const SizedBox(height: 4),
+            Text(
+              data.label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 3,
+              width: 24,
+              decoration: BoxDecoration(
+                color: selected ? color : Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

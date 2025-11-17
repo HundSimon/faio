@@ -14,16 +14,20 @@ import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
-import 'package:faio/domain/utils/tag_sorter.dart';
+import 'package:faio/core/preferences/content_safety_settings.dart';
+import 'package:faio/features/common/utils/content_warning.dart';
+import 'package:faio/features/common/widgets/categorized_tags.dart';
+import 'package:faio/features/common/widgets/content_warning_banner.dart';
+import 'package:faio/features/common/widgets/detail_info_row.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
+import 'package:faio/features/common/widgets/summary_placeholder.dart';
 import 'package:faio/features/feed/providers/feed_providers.dart';
 import 'package:faio/features/library/domain/library_entries.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
 import 'package:faio/features/library/utils/library_mappers.dart';
 import 'package:faio/features/library/presentation/widgets/favorite_icon_button.dart';
 import 'package:faio/features/novel/presentation/novel_hero.dart';
-import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../providers/novel_providers.dart';
 import 'widgets/novel_series_sheet.dart';
@@ -452,7 +456,7 @@ class _NovelDetailError extends StatelessWidget {
   }
 }
 
-class _NovelDetailContent extends ConsumerWidget {
+class _NovelDetailContent extends ConsumerStatefulWidget {
   const _NovelDetailContent({
     required this.detail,
     required this.initialContent,
@@ -468,7 +472,61 @@ class _NovelDetailContent extends ConsumerWidget {
   final FaioContent? favoriteContent;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_NovelDetailContent> createState() =>
+      _NovelDetailContentState();
+}
+
+class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
+  ContentWarning? _warning;
+  var _warningAcknowledged = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncWarning();
+    ref.listen<ContentSafetySettings>(contentSafetySettingsProvider, (
+      previous,
+      next,
+    ) {
+      if (_warning != null &&
+          next.isAutoApproved(_warning!.level) &&
+          !_warningAcknowledged) {
+        setState(() {
+          _warningAcknowledged = true;
+        });
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _NovelDetailContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.novelId != widget.novelId ||
+        oldWidget.favoriteContent?.id != widget.favoriteContent?.id ||
+        oldWidget.detail != widget.detail) {
+      setState(_syncWarning);
+    }
+  }
+
+  void _syncWarning() {
+    final tags = widget.detail.tags.isNotEmpty
+        ? widget.detail.tags
+        : (widget.initialContent?.tags ?? const <ContentTag>[]);
+    final rating =
+        widget.favoriteContent?.rating ?? widget.initialContent?.rating ?? '';
+    _warning = evaluateContentWarning(rating: rating, tags: tags);
+    final settings = ref.read(contentSafetySettingsProvider);
+    _warningAcknowledged = settings.isAutoApproved(_warning?.level);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
+    final detail = widget.detail;
+    final initialContent = widget.initialContent;
+    final novelId = widget.novelId;
+    final progressAsync = widget.progressAsync;
+    final favoriteContent = widget.favoriteContent;
     final theme = Theme.of(context);
     final progress = progressAsync.valueOrNull;
     final coverUrl =
@@ -480,11 +538,9 @@ class _NovelDetailContent extends ConsumerWidget {
     final summary = detail.description.isNotEmpty
         ? detail.description
         : (initialContent?.summary ?? detail.body);
-    final tags = ContentTagSorter.sort(
-      detail.tags.isNotEmpty
-          ? detail.tags
-          : (initialContent?.tags ?? const <ContentTag>[]),
-    );
+    final tags = detail.tags.isNotEmpty
+        ? detail.tags
+        : (initialContent?.tags ?? const <ContentTag>[]);
     final publishedAt = detail.createdAt ?? initialContent?.publishedAt;
     final favoriteEntry =
         favoriteContent ??
@@ -500,6 +556,13 @@ class _NovelDetailContent extends ConsumerWidget {
         );
       }),
     );
+    final safetySettings = ref.watch(contentSafetySettingsProvider);
+    final warning = _warning;
+    final isBlocked = safetySettings.isBlocked(warning?.level);
+    final shouldGate =
+        warning?.requiresConfirmation == true &&
+        !_warningAcknowledged &&
+        !isBlocked;
     Widget buildHero({double? height, double aspectRatio = 0.75}) {
       final lowResCover =
           initialContent?.previewUrl ?? initialContent?.sampleUrl;
@@ -522,8 +585,22 @@ class _NovelDetailContent extends ConsumerWidget {
       final favoriteLabel = '${isFavorite ? '已收藏' : '收藏'}（$displayCount）';
       final buttons = <Widget>[
         FilledButton.icon(
-          icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-          label: Text(favoriteLabel),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          ),
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, animation) =>
+                ScaleTransition(scale: animation, child: child),
+            child: Icon(
+              isFavorite ? Icons.favorite : Icons.favorite_border,
+              key: ValueKey(isFavorite),
+            ),
+          ),
+          label: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Text(favoriteLabel, key: ValueKey(favoriteLabel)),
+          ),
           onPressed: () {
             ref
                 .read(libraryFavoritesProvider.notifier)
@@ -565,37 +642,51 @@ class _NovelDetailContent extends ConsumerWidget {
                   aspectRatio: 0.68,
                 ),
               );
-              final infoChips = <Widget>[];
+              final statBadges = <Widget>[];
               final contentLength = detail.length ?? detail.body.length;
               if (favoriteEntry.rating.isNotEmpty) {
-                infoChips.add(
+                statBadges.add(
                   _InfoPill(
                     icon: Icons.shield_outlined,
                     label: '评级 ${favoriteEntry.rating}',
                   ),
                 );
               }
-              if (contentLength > 0) {
-                infoChips.add(
-                  _InfoPill(
-                    icon: Icons.text_snippet_outlined,
-                    label: '约 $contentLength 字',
-                  ),
-                );
-              }
-              if (publishedAt != null) {
-                infoChips.add(
-                  _InfoPill(
-                    icon: Icons.schedule,
-                    label: _formatDate(publishedAt),
-                  ),
-                );
-              }
               if (detail.readCount != null && detail.readCount! > 0) {
-                infoChips.add(
+                statBadges.add(
                   _InfoPill(
-                    icon: Icons.visibility,
+                    icon: Icons.visibility_outlined,
                     label: '${detail.readCount} 阅读',
+                  ),
+                );
+              }
+              final metaRows = <Widget>[];
+              if (publishedAt != null) {
+                metaRows.add(
+                  DetailInfoRow(
+                    icon: Icons.schedule,
+                    label: '发布时间',
+                    value: _formatDate(publishedAt),
+                  ),
+                );
+              }
+              if (detail.updatedAt != null) {
+                metaRows.add(
+                  DetailInfoRow(
+                    icon: Icons.update,
+                    label: '最近更新',
+                    value: _formatDate(detail.updatedAt!),
+                    subtle: true,
+                  ),
+                );
+              }
+              if (contentLength > 0) {
+                metaRows.add(
+                  DetailInfoRow(
+                    icon: Icons.text_snippet_outlined,
+                    label: '内容篇幅',
+                    value: '约 $contentLength 字',
+                    subtle: true,
                   ),
                 );
               }
@@ -620,9 +711,22 @@ class _NovelDetailContent extends ConsumerWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (infoChips.isNotEmpty) ...[
+                    if (statBadges.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      Wrap(spacing: 8, runSpacing: 8, children: infoChips),
+                      Wrap(spacing: 8, runSpacing: 8, children: statBadges),
+                    ],
+                    if (metaRows.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < metaRows.length; i++) ...[
+                            metaRows[i],
+                            if (i < metaRows.length - 1)
+                              const SizedBox(height: 8),
+                          ],
+                        ],
+                      ),
                     ],
                     if (headerActions != null) ...[
                       const SizedBox(height: 16),
@@ -658,45 +762,92 @@ class _NovelDetailContent extends ConsumerWidget {
     }
 
     Widget buildTagsCard() {
+      if (tags.isEmpty) {
+        return const SizedBox.shrink();
+      }
       return DetailSectionCard(
         title: '标签',
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: tags.map((tag) => TagChip(tag: tag)).toList(),
-        ),
+        child: CategorizedTagList(tags: tags),
       );
     }
 
     Widget buildSourceCard() {
       return DetailSectionCard(
         title: '外部链接',
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: detail.sourceLinks
-              .map(
-                (link) => OutlinedButton.icon(
-                  icon: const Icon(Icons.open_in_new),
-                  onPressed: () => _launchExternal(context, link),
-                  label: Text(link.host),
+        child: Column(
+          children: [
+            for (var i = 0; i < detail.sourceLinks.length; i++) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  detail.sourceLinks[i].host,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              )
-              .toList(),
+                subtitle: Text(
+                  detail.sourceLinks[i].toString(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => _launchExternal(context, detail.sourceLinks[i]),
+              ),
+              if (i < detail.sourceLinks.length - 1) const Divider(height: 12),
+            ],
+          ],
         ),
       );
     }
 
-    return RefreshIndicator(
+    if (isBlocked && warning != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.visibility_off_outlined,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 48,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${warning.label} 内容已被屏蔽',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '前往设置可重新允许显示。',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final listView = RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(novelDetailProvider(novelId));
         ref.invalidate(novelReadingProgressProvider(novelId));
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
         children: [
           buildHeaderSection(),
+          if (warning != null) ...[
+            const SizedBox(height: 16),
+            ContentWarningBanner(warning: warning),
+          ],
           const SizedBox(height: 16),
           _ReadActionCard(
             detail: detail,
@@ -731,10 +882,20 @@ class _NovelDetailContent extends ConsumerWidget {
           const SizedBox(height: 16),
           DetailSectionCard(
             title: '简介',
-            child: SelectableText(
-              summary.isNotEmpty ? summary : '暂无简介',
-              style: theme.textTheme.bodyLarge,
-            ),
+            child: summary.trim().isNotEmpty
+                ? SelectableText(
+                    summary,
+                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
+                  )
+                : SummaryPlaceholder(
+                    onAction: detail.sourceLinks.isEmpty
+                        ? null
+                        : () => _launchExternal(
+                            context,
+                            detail.sourceLinks.first,
+                          ),
+                    actionLabel: detail.sourceLinks.isEmpty ? null : '前往原站',
+                  ),
           ),
           if (tags.isNotEmpty) ...[const SizedBox(height: 16), buildTagsCard()],
           if (detail.series?.isValid ?? false) ...[
@@ -750,6 +911,20 @@ class _NovelDetailContent extends ConsumerWidget {
           ],
         ],
       ),
+    );
+
+    return Stack(
+      children: [
+        listView,
+        if (shouldGate && warning != null)
+          Positioned.fill(
+            child: ContentWarningOverlay(
+              warning: warning,
+              onConfirm: () => setState(() => _warningAcknowledged = true),
+              onDismiss: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1099,82 +1274,73 @@ class _NovelSeriesPreview extends ConsumerWidget {
       context.pushReplacement('/feed/novel/$selected');
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    series.title.isNotEmpty ? series.title : '所属系列',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                FavoriteIconButton.series(
-                  series: seriesFavorite,
-                  backgroundColor: Colors.transparent,
-                  iconSize: 22,
-                  padding: EdgeInsets.zero,
-                ),
-                const SizedBox(width: 4),
-                TextButton(onPressed: openSelector, child: const Text('查看选集')),
-              ],
-            ),
-            const SizedBox(height: 8),
-            seriesAsync.when(
-              data: (detail) {
-                if (detail == null || detail.novels.isEmpty) {
-                  return const Text('暂无章节列表');
-                }
-                final preview = detail.novels.take(3).toList();
-                return Column(
-                  children: preview
-                      .map(
-                        (entry) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            entry.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          leading: Icon(
-                            entry.id == currentNovelId
-                                ? Icons.play_arrow
-                                : Icons.menu_book_outlined,
-                          ),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () async {
-                            if (entry.id == currentNovelId) {
-                              await openSelector();
-                              return;
-                            }
-                            if (!context.mounted) return;
-                            context.pushReplacement('/feed/novel/${entry.id}');
-                          },
+    return DetailSectionCard(
+      title: series.title.isNotEmpty ? series.title : '所属系列',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              FavoriteIconButton.series(
+                series: seriesFavorite,
+                backgroundColor: Colors.transparent,
+                iconSize: 22,
+                padding: EdgeInsets.zero,
+              ),
+              const SizedBox(width: 4),
+              TextButton(onPressed: openSelector, child: const Text('查看选集')),
+            ],
+          ),
+          const SizedBox(height: 8),
+          seriesAsync.when(
+            data: (detail) {
+              if (detail == null || detail.novels.isEmpty) {
+                return const Text('暂无章节列表');
+              }
+              final preview = detail.novels.take(3).toList();
+              return Column(
+                children: preview
+                    .map(
+                      (entry) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      )
-                      .toList(),
-                );
-              },
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: LinearProgressIndicator(),
-              ),
-              error: (error, stackTrace) => Text(
-                '系列加载失败：$error',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
+                        leading: Icon(
+                          entry.id == currentNovelId
+                              ? Icons.play_arrow
+                              : Icons.menu_book_outlined,
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () async {
+                          if (entry.id == currentNovelId) {
+                            await openSelector();
+                            return;
+                          }
+                          if (!context.mounted) return;
+                          context.pushReplacement('/feed/novel/${entry.id}');
+                        },
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            ),
+            error: (error, stackTrace) => Text(
+              '系列加载失败：$error',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

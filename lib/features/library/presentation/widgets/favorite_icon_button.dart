@@ -57,34 +57,52 @@ class FavoriteIconButton extends ConsumerWidget {
     );
     final notifier = ref.read(libraryFavoritesProvider.notifier);
     final theme = Theme.of(context);
-    final containerColor =
+    final dynamicColor =
         backgroundColor ??
-        theme.colorScheme.surface.withOpacity(
-          theme.brightness == Brightness.dark ? 0.72 : 0.82,
-        );
+        (isFavorite
+            ? theme.colorScheme.primary.withValues(alpha: 0.15)
+            : theme.colorScheme.surface.withValues(
+                alpha: theme.brightness == Brightness.dark ? 0.72 : 0.82,
+              ));
 
-    return Material(
-      color: containerColor,
-      shape: const CircleBorder(),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
+      decoration: ShapeDecoration(
+        color: dynamicColor,
+        shape: const CircleBorder(),
+      ),
       child: Padding(
         padding: padding,
-        child: IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          iconSize: iconSize,
-          color: isFavorite
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurface,
-          tooltip: isFavorite ? '取消收藏' : '收藏',
-          icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-          onPressed: () async {
-            if (_content != null) {
-              await notifier.toggleContentFavorite(_content);
-            } else if (_series != null) {
-              await notifier.toggleSeriesFavorite(_series);
-            }
-            onToggled?.call(!isFavorite);
-          },
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 220),
+          scale: isFavorite ? 1.08 : 1,
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            iconSize: iconSize,
+            color: isFavorite
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface,
+            tooltip: isFavorite ? '取消收藏' : '收藏',
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              transitionBuilder: (child, animation) =>
+                  ScaleTransition(scale: animation, child: child),
+              child: Icon(
+                isFavorite ? Icons.favorite : Icons.favorite_border,
+                key: ValueKey(isFavorite),
+              ),
+            ),
+            onPressed: () async {
+              if (_content != null) {
+                await notifier.toggleContentFavorite(_content);
+              } else if (_series != null) {
+                await notifier.toggleSeriesFavorite(_series);
+              }
+              onToggled?.call(!isFavorite);
+            },
+          ),
         ),
       ),
     );
