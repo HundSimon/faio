@@ -267,7 +267,7 @@ class _MetaChip extends StatelessWidget {
     return Chip(
       avatar: Icon(icon, size: 16),
       label: Text(label),
-      backgroundColor: theme.colorScheme.surfaceVariant,
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
     );
   }
 }
@@ -301,7 +301,7 @@ class _IllustrationDetailView extends StatelessWidget {
         height: 280,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant,
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(28),
         ),
         child: Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: 48),
@@ -439,7 +439,7 @@ class _IllustrationDetailView extends StatelessWidget {
               .map(
                 (tag) => Chip(
                   label: Text(tag),
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 ),
               )
               .toList(),
@@ -552,7 +552,7 @@ class _ProgressiveIllustrationImageState
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = Theme.of(context).colorScheme.surfaceVariant;
+    final backgroundColor = Theme.of(context).colorScheme.surfaceContainerHighest;
     final layers = <Widget>[
       Positioned.fill(
         child: widget.lowRes != null

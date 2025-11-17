@@ -23,7 +23,6 @@ import 'package:faio/features/library/presentation/widgets/favorite_icon_button.
 import 'package:faio/features/novel/presentation/novel_hero.dart';
 
 import '../providers/novel_providers.dart';
-import 'widgets/novel_image.dart';
 import 'widgets/novel_series_sheet.dart';
 
 class NovelDetailRouteExtra {
@@ -109,9 +108,9 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
       _lastRecordedContentId = null;
     });
     ref.read(novelFeedSelectionProvider.notifier).select(index);
-    ref.read(pixivNovelFeedControllerProvider.notifier).ensureIndexLoaded(
-      index + 1,
-    );
+    ref
+        .read(pixivNovelFeedControllerProvider.notifier)
+        .ensureIndexLoaded(index + 1);
   }
 
   void _recordHistory(FaioContent content, {bool force = false}) {
@@ -160,7 +159,6 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
     return null;
   }
 
-
   int _novelIdForIndex(List<FaioContent> items, int index) {
     if (index >= 0 && index < items.length) {
       return parseContentNumericId(items[index]) ?? widget.novelId;
@@ -170,8 +168,10 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<NovelFeedSelectionState>(
-        novelFeedSelectionProvider, (previous, next) {
+    ref.listen<NovelFeedSelectionState>(novelFeedSelectionProvider, (
+      previous,
+      next,
+    ) {
       if (!mounted) return;
       final selected = next.selectedIndex;
       if (selected != null &&
@@ -190,7 +190,8 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
     }
 
     final hasPager = _pageController != null && items.isNotEmpty;
-    final activeContent = hasPager &&
+    final activeContent =
+        hasPager &&
             _currentIndex != null &&
             _currentIndex! >= 0 &&
             _currentIndex! < items.length
@@ -286,8 +287,7 @@ class _NovelDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(novelDetailProvider(novelId));
-    final progressAsync =
-        ref.watch(novelReadingProgressProvider(novelId));
+    final progressAsync = ref.watch(novelReadingProgressProvider(novelId));
     final detail = detailAsync.valueOrNull;
     final historyContent = detail != null
         ? novelDetailToContent(detail, fallback: initialContent)
@@ -296,10 +296,7 @@ class _NovelDetailPage extends ConsumerWidget {
       onRecordHistory(historyContent, force: detail != null);
     }
     final fallbackDetail = initialContent != null
-        ? contentToNovelDetail(
-            initialContent!,
-            novelIdOverride: novelId,
-          )
+        ? contentToNovelDetail(initialContent!, novelIdOverride: novelId)
         : null;
 
     return detailAsync.when(
@@ -375,18 +372,14 @@ class _NovelDetailSkeleton extends StatelessWidget {
     final theme = Theme.of(context);
     final initialCoverUrl =
         initialContent?.sampleUrl ?? initialContent?.previewUrl;
-    Widget line({
-      double height = 14,
-      double? width,
-      double radius = 8,
-    }) {
+    Widget line({double height = 14, double? width, double radius = 8}) {
       return Skeleton.leaf(
         child: Container(
           height: height,
           width: width,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(radius),
-            color: theme.colorScheme.surfaceVariant,
+            color: theme.colorScheme.surfaceContainerHighest,
           ),
         ),
       );
@@ -403,7 +396,7 @@ class _NovelDetailSkeleton extends StatelessWidget {
               contentId: initialContent?.id,
               lowRes: initialCoverUrl,
               highRes: initialCoverUrl,
-              fallbackColor: theme.colorScheme.surfaceVariant,
+              fallbackColor: theme.colorScheme.surfaceContainerHighest,
             ),
             const SizedBox(height: 24),
             line(height: 30, radius: 10),
@@ -420,9 +413,7 @@ class _NovelDetailSkeleton extends StatelessWidget {
             const SizedBox(height: 32),
             Row(
               children: [
-                Expanded(
-                  child: line(height: 44, radius: 999),
-                ),
+                Expanded(child: line(height: 44, radius: 999)),
                 const SizedBox(width: 12),
                 line(height: 44, width: 44, radius: 999),
               ],
@@ -448,15 +439,9 @@ class _NovelDetailError extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '加载失败：$message',
-              textAlign: TextAlign.center,
-            ),
+            Text('加载失败：$message', textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(
-              onPressed: onRetry,
-              child: const Text('重试'),
-            ),
+            FilledButton(onPressed: onRetry, child: const Text('重试')),
           ],
         ),
       ),
@@ -483,7 +468,8 @@ class _NovelDetailContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final progress = progressAsync.valueOrNull;
-    final coverUrl = detail.coverUrl ??
+    final coverUrl =
+        detail.coverUrl ??
         initialContent?.sampleUrl ??
         initialContent?.previewUrl;
     final authorName =
@@ -496,7 +482,8 @@ class _NovelDetailContent extends ConsumerWidget {
         : (initialContent?.tags ?? const []);
     final publishedAt = detail.createdAt ?? initialContent?.publishedAt;
     final favoriteEntry =
-        favoriteContent ?? novelDetailToContent(detail, fallback: initialContent);
+        favoriteContent ??
+        novelDetailToContent(detail, fallback: initialContent);
     final isFavorite = ref.watch(
       libraryFavoritesProvider.select((asyncValue) {
         final entries = asyncValue.valueOrNull;
@@ -508,17 +495,14 @@ class _NovelDetailContent extends ConsumerWidget {
         );
       }),
     );
-    Widget buildHero({
-      double? height,
-      double aspectRatio = 0.75,
-    }) {
+    Widget buildHero({double? height, double aspectRatio = 0.75}) {
       final lowResCover =
           initialContent?.previewUrl ?? initialContent?.sampleUrl;
       return _NovelHeroImage(
         contentId: favoriteEntry.id,
         lowRes: lowResCover,
         highRes: coverUrl ?? lowResCover,
-        fallbackColor: theme.colorScheme.surfaceVariant,
+        fallbackColor: theme.colorScheme.surfaceContainerHighest,
         height: height,
         aspectRatio: aspectRatio,
       );
@@ -530,8 +514,7 @@ class _NovelDetailContent extends ConsumerWidget {
     }) {
       final baseCount = favoriteEntry.favoriteCount;
       final displayCount = baseCount + (isFavorite ? 1 : 0);
-      final favoriteLabel =
-          '${isFavorite ? '已收藏' : '收藏'}（$displayCount）';
+      final favoriteLabel = '${isFavorite ? '已收藏' : '收藏'}（$displayCount）';
       final buttons = <Widget>[
         FilledButton.icon(
           icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
@@ -551,9 +534,8 @@ class _NovelDetailContent extends ConsumerWidget {
         runSpacing: 12,
         children: buttons
             .map(
-              (button) => isCompact
-                  ? SizedBox(width: maxWidth, child: button)
-                  : button,
+              (button) =>
+                  isCompact ? SizedBox(width: maxWidth, child: button) : button,
             )
             .toList(),
       );
@@ -569,10 +551,7 @@ class _NovelDetailContent extends ConsumerWidget {
             builder: (context, constraints) {
               final isCompact = constraints.maxWidth < 520;
               final coverWidth = math
-                  .min(
-                    isCompact ? constraints.maxWidth * 0.55 : 220,
-                    220.0,
-                  )
+                  .min(isCompact ? constraints.maxWidth * 0.55 : 220, 220.0)
                   .toDouble();
               final cover = SizedBox(
                 width: coverWidth,
@@ -603,7 +582,7 @@ class _NovelDetailContent extends ConsumerWidget {
                 infoChips.add(
                   _InfoPill(
                     icon: Icons.schedule,
-                    label: _formatDate(publishedAt!),
+                    label: _formatDate(publishedAt),
                   ),
                 );
               }
@@ -638,11 +617,7 @@ class _NovelDetailContent extends ConsumerWidget {
                     ),
                     if (infoChips.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: infoChips,
-                      ),
+                      Wrap(spacing: 8, runSpacing: 8, children: infoChips),
                     ],
                     if (headerActions != null) ...[
                       const SizedBox(height: 16),
@@ -656,10 +631,7 @@ class _NovelDetailContent extends ConsumerWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Align(
-                      alignment: Alignment.center,
-                      child: cover,
-                    ),
+                    Align(alignment: Alignment.center, child: cover),
                     const SizedBox(height: 16),
                     buildInfoColumn(),
                   ],
@@ -690,7 +662,7 @@ class _NovelDetailContent extends ConsumerWidget {
               .map(
                 (tag) => Chip(
                   label: Text(tag),
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 ),
               )
               .toList(),
@@ -740,13 +712,11 @@ class _NovelDetailContent extends ConsumerWidget {
                 : () async {
                     final storage = ref.read(novelReadingStorageProvider);
                     await storage.clearProgress(novelId);
-                    ref.invalidate(
-                      novelReadingProgressProvider(novelId),
-                    );
+                    ref.invalidate(novelReadingProgressProvider(novelId));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已清除阅读进度')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('已清除阅读进度')));
                     }
                   },
             onRetryProgress: () {
@@ -754,10 +724,10 @@ class _NovelDetailContent extends ConsumerWidget {
             },
             onOpenChapters: detail.series?.isValid ?? false
                 ? () => _openNovelChapterSelector(
-                      context,
-                      detail.series!,
-                      novelId,
-                    )
+                    context,
+                    detail.series!,
+                    novelId,
+                  )
                 : null,
           ),
           const SizedBox(height: 16),
@@ -768,10 +738,7 @@ class _NovelDetailContent extends ConsumerWidget {
               style: theme.textTheme.bodyLarge,
             ),
           ),
-          if (tags.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            buildTagsCard(),
-          ],
+          if (tags.isNotEmpty) ...[const SizedBox(height: 16), buildTagsCard()],
           if (detail.series?.isValid ?? false) ...[
             const SizedBox(height: 16),
             _NovelSeriesPreview(
@@ -791,9 +758,9 @@ class _NovelDetailContent extends ConsumerWidget {
   Future<void> _launchExternal(BuildContext context, Uri url) async {
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('无法打开链接：${url.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('无法打开链接：${url.toString()}')));
     }
   }
 }
@@ -867,7 +834,7 @@ class _ReadActionCard extends StatelessWidget {
     } else if (hasProgress) {
       trailingStatus = _ReadStatusChip(
         key: const ValueKey('status-sync'),
-        label: '上次同步 ${_formatRelativeTime(progress!.updatedAt)}',
+        label: '上次同步 ${_formatRelativeTime(progress.updatedAt)}',
         foreground: onCardMuted,
       );
     } else {
@@ -910,7 +877,7 @@ class _ReadActionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             LinearProgressIndicator(
-              value: progress!.relativeOffset.clamp(0.0, 1.0),
+              value: progress.relativeOffset.clamp(0.0, 1.0),
               minHeight: 6,
               color: theme.colorScheme.primary,
               backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
@@ -918,9 +885,7 @@ class _ReadActionCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '已读 $formattedPercent% · 更新于 ${_formatDate(progress.updatedAt)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: onCardMuted,
-              ),
+              style: theme.textTheme.bodySmall?.copyWith(color: onCardMuted),
             ),
           ],
         );
@@ -936,9 +901,7 @@ class _ReadActionCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             '还未开始，点击上方开始阅读',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: onCardMuted,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: onCardMuted),
           ),
         ],
       );
@@ -1051,7 +1014,8 @@ class _ReadStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bg = background ??
+    final bg =
+        background ??
         theme.colorScheme.onSurface.withOpacity(
           theme.brightness == Brightness.dark ? 0.14 : 0.12,
         );
@@ -1098,9 +1062,7 @@ class _GradientProgressTrack extends StatelessWidget {
       width: double.infinity,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [startColor, endColor],
-          ),
+          gradient: LinearGradient(colors: [startColor, endColor]),
           borderRadius: BorderRadius.circular(999),
         ),
       ),
@@ -1162,10 +1124,7 @@ class _NovelSeriesPreview extends ConsumerWidget {
                   padding: EdgeInsets.zero,
                 ),
                 const SizedBox(width: 4),
-                TextButton(
-                  onPressed: openSelector,
-                  child: const Text('查看选集'),
-                ),
+                TextButton(onPressed: openSelector, child: const Text('查看选集')),
               ],
             ),
             const SizedBox(height: 8),
@@ -1198,9 +1157,7 @@ class _NovelSeriesPreview extends ConsumerWidget {
                               return;
                             }
                             if (!context.mounted) return;
-                            context.pushReplacement(
-                              '/feed/novel/${entry.id}',
-                            );
+                            context.pushReplacement('/feed/novel/${entry.id}');
                           },
                         ),
                       )
@@ -1227,7 +1184,7 @@ class _NovelSeriesPreview extends ConsumerWidget {
 
 String _formatDate(DateTime dateTime) {
   final local = dateTime.toLocal();
-  final two = (int value) => value.toString().padLeft(2, '0');
+  String two(int value) => value.toString().padLeft(2, '0');
   return '${local.year}-${two(local.month)}-${two(local.day)} '
       '${two(local.hour)}:${two(local.minute)}';
 }
@@ -1264,11 +1221,7 @@ String _formatRelativeTime(DateTime dateTime) {
 }
 
 class _InfoPill extends StatelessWidget {
-  const _InfoPill({
-    required this.icon,
-    required this.label,
-    this.background,
-  });
+  const _InfoPill({required this.icon, required this.label, this.background});
 
   final IconData icon;
   final String label;
@@ -1279,8 +1232,9 @@ class _InfoPill extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: background ??
-            theme.colorScheme.surfaceVariant.withOpacity(
+        color:
+            background ??
+            theme.colorScheme.surfaceContainerHighest.withOpacity(
               theme.brightness == Brightness.dark ? 0.7 : 0.9,
             ),
         borderRadius: BorderRadius.circular(999),
@@ -1331,7 +1285,7 @@ class _NovelHeroImage extends StatelessWidget {
       child = Container(
         height: height ?? 260,
         decoration: BoxDecoration(
-          color: fallbackColor ?? theme.colorScheme.surfaceVariant,
+          color: fallbackColor ?? theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(24),
         ),
         alignment: Alignment.center,
@@ -1349,7 +1303,8 @@ class _NovelHeroImage extends StatelessWidget {
           child: _ProgressiveNovelImage(
             lowRes: lowRes,
             highRes: highRes,
-            fallbackColor: fallbackColor ?? theme.colorScheme.surfaceVariant,
+            fallbackColor:
+                fallbackColor ?? theme.colorScheme.surfaceContainerHighest,
           ),
         ),
       );
@@ -1409,9 +1364,8 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
                   cacheManager: pixivImageCacheManagerForUrl(widget.lowRes),
                 ),
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: widget.fallbackColor,
-                ),
+                errorBuilder: (_, __, ___) =>
+                    Container(color: widget.fallbackColor),
               )
             : Container(color: widget.fallbackColor),
       ),
@@ -1453,19 +1407,13 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
-              colors: [
-                Colors.black.withOpacity(0.35),
-                Colors.transparent,
-              ],
+              colors: [Colors.black.withOpacity(0.35), Colors.transparent],
             ),
           ),
         ),
       ),
     );
 
-    return Stack(
-      fit: StackFit.expand,
-      children: layers,
-    );
+    return Stack(fit: StackFit.expand, children: layers);
   }
 }

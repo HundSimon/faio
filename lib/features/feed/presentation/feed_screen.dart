@@ -117,7 +117,7 @@ Future<void> _showAllTags(BuildContext context, List<String> tags) async {
                     .map(
                       (tag) => Chip(
                         label: Text(tag),
-                        backgroundColor: theme.colorScheme.surfaceVariant,
+                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
                       ),
                     )
                     .toList(),
@@ -412,7 +412,7 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceVariant.withOpacity(
+          color: colorScheme.surfaceContainerHighest.withOpacity(
             theme.brightness == Brightness.dark ? 0.4 : 0.6,
           ),
           borderRadius: BorderRadius.circular(16),
@@ -968,7 +968,7 @@ class _IllustrationSkeletonTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.surfaceVariant;
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return Skeleton.leaf(
       child: AspectRatio(
         aspectRatio: 1,
@@ -1052,7 +1052,7 @@ class _NovelListItem extends ConsumerWidget {
     final authorName = item.authorName?.trim();
     final hasAuthor = authorName?.isNotEmpty ?? false;
     final cardColor = Color.alphaBlend(
-      theme.colorScheme.surfaceVariant.withOpacity(
+      theme.colorScheme.surfaceContainerHighest.withOpacity(
         theme.brightness == Brightness.dark ? 0.28 : 0.2,
       ),
       theme.colorScheme.surface,
@@ -1101,7 +1101,7 @@ class _NovelListItem extends ConsumerWidget {
         child = ClipRRect(
           borderRadius: borderRadius,
           child: Container(
-            color: theme.colorScheme.surfaceVariant,
+            color: theme.colorScheme.surfaceContainerHighest,
             alignment: Alignment.center,
             child: Icon(
               Icons.menu_book,
@@ -1119,7 +1119,7 @@ class _NovelListItem extends ConsumerWidget {
             headers: headers,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
-              color: theme.colorScheme.surfaceVariant,
+              color: theme.colorScheme.surfaceContainerHighest,
               alignment: Alignment.center,
               child: Icon(
                 Icons.broken_image,
@@ -1366,7 +1366,7 @@ class _NovelListSkeletonItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cardColor = Color.alphaBlend(
-      theme.colorScheme.surfaceVariant.withOpacity(
+      theme.colorScheme.surfaceContainerHighest.withOpacity(
         theme.brightness == Brightness.dark ? 0.28 : 0.2,
       ),
       theme.colorScheme.surface,
@@ -1380,7 +1380,7 @@ class _NovelListSkeletonItem extends StatelessWidget {
           height: height,
           width: width,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
+            color: theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(radius),
           ),
         ),
@@ -1404,7 +1404,7 @@ class _NovelListSkeletonItem extends StatelessWidget {
                 height: coverHeight,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: theme.colorScheme.surfaceVariant,
+                  color: theme.colorScheme.surfaceContainerHighest,
                 ),
               ),
             ),
@@ -1452,7 +1452,7 @@ class _ContentTile extends StatelessWidget {
     final preview = item.previewUrl ?? item.sampleUrl;
     Widget placeholder({IconData? icon}) {
       return Container(
-        color: theme.colorScheme.surfaceVariant,
+        color: theme.colorScheme.surfaceContainerHighest,
         alignment: Alignment.center,
         child: icon == null
             ? null

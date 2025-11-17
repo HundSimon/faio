@@ -200,7 +200,7 @@ class _LibraryContentTile extends StatelessWidget {
         : (content.tags.isNotEmpty ? content.tags.join(', ') : '暂无简介');
 
     return Material(
-      color: theme.colorScheme.surfaceVariant.withOpacity(
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(
         theme.brightness == Brightness.dark ? 0.35 : 0.5,
       ),
       borderRadius: BorderRadius.circular(16),
@@ -278,7 +278,7 @@ class _LibrarySeriesTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceVariant.withOpacity(
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(
         theme.brightness == Brightness.dark ? 0.35 : 0.45,
       ),
       borderRadius: BorderRadius.circular(16),
@@ -413,7 +413,7 @@ class _EmptyHint extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: theme.colorScheme.surfaceVariant.withOpacity(
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(
           theme.brightness == Brightness.dark ? 0.24 : 0.4,
         ),
       ),
@@ -575,7 +575,7 @@ class _LibraryContentPreview extends StatelessWidget {
                     .map(
                       (tag) => Chip(
                         label: Text(tag),
-                        backgroundColor: theme.colorScheme.surfaceVariant,
+                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
                       ),
                     )
                     .toList(),
@@ -639,7 +639,7 @@ class _PreviewImageState extends State<_PreviewImage> {
           return const SizedBox.shrink();
         }
         return Container(
-          color: theme.colorScheme.surfaceVariant,
+          color: theme.colorScheme.surfaceContainerHighest,
           alignment: Alignment.center,
           child: Icon(
             Icons.broken_image,

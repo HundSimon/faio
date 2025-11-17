@@ -102,7 +102,7 @@ class _SeriesSheetBody extends StatelessWidget {
                           (tag) => Chip(
                             label: Text(tag),
                             backgroundColor:
-                                theme.colorScheme.surfaceVariant,
+                                theme.colorScheme.surfaceContainerHighest,
                           ),
                         )
                         .toList(),
@@ -165,7 +165,7 @@ class _SeriesCover extends StatelessWidget {
       width: 56,
       height: 80,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(

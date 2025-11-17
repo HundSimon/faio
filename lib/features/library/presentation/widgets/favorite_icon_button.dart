@@ -44,14 +44,14 @@ class FavoriteIconButton extends ConsumerWidget {
         if (_content != null) {
           return entries.any(
             (entry) =>
-                entry.isContent && entry.content!.id == _content!.id,
+                entry.isContent && entry.content!.id == _content.id,
           );
         }
         if (_series != null) {
           return entries.any(
             (entry) =>
                 entry.isSeries &&
-                entry.series!.seriesId == _series!.seriesId,
+                entry.series!.seriesId == _series.seriesId,
           );
         }
         return false;
@@ -81,9 +81,9 @@ class FavoriteIconButton extends ConsumerWidget {
           icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
           onPressed: () async {
             if (_content != null) {
-              await notifier.toggleContentFavorite(_content!);
+              await notifier.toggleContentFavorite(_content);
             } else if (_series != null) {
-              await notifier.toggleSeriesFavorite(_series!);
+              await notifier.toggleSeriesFavorite(_series);
             }
             onToggled?.call(!isFavorite);
           },

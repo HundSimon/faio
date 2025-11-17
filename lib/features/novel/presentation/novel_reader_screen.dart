@@ -196,7 +196,7 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                         ? constraints.maxWidth - 40
                         : constraints.maxWidth;
                     final contentWidth = availableWidth.isFinite
-                        ? (availableWidth.clamp(80.0, double.infinity) as double)
+                        ? availableWidth.clamp(80.0, double.infinity)
                         : availableWidth;
                     _ensureLayoutMetrics(
                       context: context,
@@ -686,7 +686,7 @@ class _NovelReaderSkeleton extends StatelessWidget {
           height: height,
           width: width,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
+            color: theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(radius),
           ),
         ),
