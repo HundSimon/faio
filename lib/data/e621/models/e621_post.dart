@@ -30,6 +30,46 @@ enum E621Rating {
   }
 }
 
+enum E621TagCategory {
+  general,
+  artist,
+  copyright,
+  character,
+  species,
+  invalid,
+  meta,
+  lore,
+  contributor;
+
+  static E621TagCategory? fromKey(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    switch (value) {
+      case 'general':
+        return E621TagCategory.general;
+      case 'artist':
+        return E621TagCategory.artist;
+      case 'copyright':
+        return E621TagCategory.copyright;
+      case 'character':
+        return E621TagCategory.character;
+      case 'species':
+        return E621TagCategory.species;
+      case 'invalid':
+        return E621TagCategory.invalid;
+      case 'meta':
+        return E621TagCategory.meta;
+      case 'lore':
+        return E621TagCategory.lore;
+      case 'contributor':
+        return E621TagCategory.contributor;
+      default:
+        return null;
+    }
+  }
+}
+
 class E621FileInfo extends Equatable {
   const E621FileInfo({
     required this.url,
@@ -85,6 +125,7 @@ class E621Post extends Equatable {
     this.updatedAt,
     required this.rating,
     required this.tags,
+    required this.tagCategories,
     required this.description,
     required this.file,
     required this.preview,
@@ -98,6 +139,7 @@ class E621Post extends Equatable {
   final DateTime? updatedAt;
   final E621Rating rating;
   final List<String> tags;
+  final Map<String, E621TagCategory> tagCategories;
   final String description;
   final E621FileInfo file;
   final E621PreviewInfo preview;
@@ -117,12 +159,14 @@ class E621Post extends Equatable {
         parseDate(json['created_at'] as String?) ??
         DateTime.fromMillisecondsSinceEpoch(0);
 
+    final parsedTags = _parseTags(json['tags']);
     return E621Post(
       id: json['id'] as int,
       createdAt: createdAt,
       updatedAt: parseDate(json['updated_at'] as String?),
       rating: E621Rating.fromString(json['rating'] as String? ?? 's'),
-      tags: _parseTags(json['tags']),
+      tags: parsedTags.all,
+      tagCategories: parsedTags.categoryMap,
       description: json['description'] as String? ?? '',
       file: E621FileInfo.fromJson(
         json['file'] as Map<String, dynamic>? ?? const {},
@@ -138,20 +182,37 @@ class E621Post extends Equatable {
     );
   }
 
-  static List<String> _parseTags(dynamic value) {
+  static _ParsedTags _parseTags(dynamic value) {
     if (value is Map<String, dynamic>) {
       final all = <String>[];
+      final categoryMap = <String, E621TagCategory>{};
       for (final entry in value.entries) {
-        if (entry.value is List) {
-          all.addAll(List<String>.from(entry.value as List));
+        final category = E621TagCategory.fromKey(entry.key);
+        final rawList = entry.value;
+        if (rawList is List) {
+          for (final raw in rawList) {
+            if (raw is! String) {
+              continue;
+            }
+            all.add(raw);
+            if (category != null) {
+              categoryMap[raw] = category;
+            }
+          }
         }
       }
-      return all;
+      return _ParsedTags(all: all, categoryMap: categoryMap);
     }
     if (value is List) {
-      return List<String>.from(value);
+      return _ParsedTags(
+        all: value.whereType<String>().toList(growable: false),
+        categoryMap: const <String, E621TagCategory>{},
+      );
     }
-    return const [];
+    return const _ParsedTags(
+      all: <String>[],
+      categoryMap: <String, E621TagCategory>{},
+    );
   }
 
   static List<Uri> _parseSources(dynamic value) {
@@ -172,6 +233,9 @@ class E621Post extends Equatable {
     updatedAt,
     rating,
     tags,
+    tagCategories.entries
+        .map((entry) => '${entry.key}:${entry.value.name}')
+        .toList(growable: false),
     description,
     file,
     sample,
@@ -179,4 +243,11 @@ class E621Post extends Equatable {
     sources,
     favCount,
   ];
+}
+
+class _ParsedTags {
+  const _ParsedTags({required this.all, required this.categoryMap});
+
+  final List<String> all;
+  final Map<String, E621TagCategory> categoryMap;
 }

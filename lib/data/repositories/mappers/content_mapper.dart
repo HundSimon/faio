@@ -21,6 +21,7 @@ class ContentMapper {
     final sample = post.sample.url;
     final original = post.file.url;
     final aspectRatio = _resolveAspectRatio(post);
+    final tagCategories = _mapE621TagCategories(post.tagCategories);
 
     return FaioContent(
       id: 'e621:${post.id}',
@@ -36,7 +37,7 @@ class ContentMapper {
       updatedAt: post.updatedAt,
       rating: post.rating.toNormalizedRating(),
       authorName: null,
-      tags: _buildStringTags(post.tags),
+      tags: _buildStringTags(post.tags, categoryOverrides: tagCategories),
       favoriteCount: post.favCount,
       sourceLinks: post.sources,
     );
@@ -241,13 +242,40 @@ class ContentMapper {
     return builder.build();
   }
 
-  static List<ContentTag> _buildStringTags(List<String> tags) {
+  static List<ContentTag> _buildStringTags(
+    List<String> tags, {
+    Map<String, ContentTagCategory>? categoryOverrides,
+  }) {
     final builder = ContentTagBuilder();
     for (final tag in tags) {
-      if (tag.trim().isEmpty) continue;
-      builder.addLabel(tag);
+      final normalized = tag.trim();
+      if (normalized.isEmpty) {
+        continue;
+      }
+      builder.addLabel(normalized, category: categoryOverrides?[normalized]);
     }
     return builder.build();
+  }
+
+  static Map<String, ContentTagCategory> _mapE621TagCategories(
+    Map<String, E621TagCategory> raw,
+  ) {
+    final mapped = <String, ContentTagCategory>{};
+    for (final entry in raw.entries) {
+      final tagName = entry.key.trim();
+      if (tagName.isEmpty) {
+        continue;
+      }
+      final category = switch (entry.value) {
+        E621TagCategory.species => ContentTagCategory.species,
+        E621TagCategory.character => ContentTagCategory.character,
+        E621TagCategory.copyright => ContentTagCategory.theme,
+        E621TagCategory.lore => ContentTagCategory.theme,
+        _ => ContentTagCategory.general,
+      };
+      mapped[tagName] = category;
+    }
+    return mapped;
   }
 
   static String _furryNovelRating(List<ContentTag> tags) {

@@ -66,6 +66,10 @@ List<TagCategoryGroup> buildTagCategoryGroups(Iterable<ContentTag> tags) {
 }
 
 TagCategoryType _categorize(ContentTag tag) {
+  final preferredCategory = tag.category;
+  if (preferredCategory != null) {
+    return _mapCategory(preferredCategory);
+  }
   final canonical = tag.canonicalName.toLowerCase();
   final display = tag.displayName.toLowerCase();
   if (_matchesAny(canonical, display, _ratingKeywords)) {
@@ -84,6 +88,23 @@ TagCategoryType _categorize(ContentTag tag) {
     return TagCategoryType.trait;
   }
   return TagCategoryType.general;
+}
+
+TagCategoryType _mapCategory(ContentTagCategory category) {
+  switch (category) {
+    case ContentTagCategory.contentRating:
+      return TagCategoryType.contentRating;
+    case ContentTagCategory.theme:
+      return TagCategoryType.theme;
+    case ContentTagCategory.species:
+      return TagCategoryType.species;
+    case ContentTagCategory.character:
+      return TagCategoryType.character;
+    case ContentTagCategory.trait:
+      return TagCategoryType.trait;
+    case ContentTagCategory.general:
+      return TagCategoryType.general;
+  }
 }
 
 bool _matchesAny(String canonical, String display, List<String> keywords) {

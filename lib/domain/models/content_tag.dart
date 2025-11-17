@@ -2,12 +2,37 @@ import 'package:equatable/equatable.dart';
 
 import '../utils/tag_normalizer.dart';
 
+/// High-level classification for content tags. This allows upstream services to
+/// pass along their own categorization (e.g. e621 species/character tags) so we
+/// can skip heuristic detection when possible.
+enum ContentTagCategory {
+  contentRating,
+  theme,
+  species,
+  character,
+  trait,
+  general;
+
+  static ContentTagCategory? fromName(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    for (final category in ContentTagCategory.values) {
+      if (category.name == value) {
+        return category;
+      }
+    }
+    return null;
+  }
+}
+
 /// Represents a unified tag with a canonical name and display label.
 class ContentTag extends Equatable {
   ContentTag({
     required this.canonicalName,
     required this.displayName,
     Set<String>? aliases,
+    this.category,
   }) : aliases = aliases == null
            ? {canonicalName}
            : {...aliases, canonicalName};
@@ -15,6 +40,7 @@ class ContentTag extends Equatable {
   final String canonicalName;
   final String displayName;
   final Set<String> aliases;
+  final ContentTagCategory? category;
 
   bool matches(String raw) {
     final normalized = TagNormalizer.normalize(raw);
@@ -27,6 +53,7 @@ class ContentTag extends Equatable {
       canonicalName: canonicalName,
       displayName: _preferDisplay(displayName, other.displayName),
       aliases: mergedAliases,
+      category: category ?? other.category,
     );
   }
 
@@ -58,6 +85,7 @@ class ContentTag extends Equatable {
     required String primary,
     String? display,
     Iterable<String> alternatives = const [],
+    ContentTagCategory? category,
   }) {
     var canonical = TagNormalizer.normalize(primary);
     final normalizedAlternatives = alternatives
@@ -75,6 +103,7 @@ class ContentTag extends Equatable {
       canonicalName: canonical,
       displayName: defaultDisplay.trim(),
       aliases: normalizedAlternatives,
+      category: category,
     );
   }
 
@@ -83,6 +112,7 @@ class ContentTag extends Equatable {
       'canonical': canonicalName,
       'display': displayName,
       'aliases': aliases.toList(),
+      'category': category?.name,
     };
   }
 
@@ -102,9 +132,10 @@ class ContentTag extends Equatable {
       canonicalName: canonical,
       displayName: display,
       aliases: aliasList.isEmpty ? {canonical} : {...aliasList, canonical},
+      category: ContentTagCategory.fromName(json['category'] as String?),
     );
   }
 
   @override
-  List<Object?> get props => [canonicalName, displayName, aliases];
+  List<Object?> get props => [canonicalName, displayName, aliases, category];
 }

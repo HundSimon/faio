@@ -8,11 +8,13 @@ class ContentTagBuilder {
     String label, {
     String? display,
     Iterable<String> aliases = const [],
+    ContentTagCategory? category,
   }) {
     final tag = ContentTag.fromLabels(
       primary: label,
       display: display,
       alternatives: aliases,
+      category: category,
     );
     if (tag.canonicalName.isEmpty) {
       return;
