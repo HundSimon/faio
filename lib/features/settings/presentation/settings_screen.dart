@@ -182,13 +182,6 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const Card(
-            child: ListTile(
-              title: Text('网络策略'),
-              subtitle: Text('DoH/代理、SNI 防护等功能即将上线'),
-            ),
-          ),
-          const SizedBox(height: 16),
           Card(
             child: ListTile(
               title: const Text('开源许可与鸣谢'),
