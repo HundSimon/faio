@@ -14,6 +14,7 @@ import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/utils/content_warning.dart';
 import 'package:faio/features/common/widgets/categorized_tags.dart';
+import 'package:faio/features/common/widgets/content_rating_badge.dart';
 import 'package:faio/features/common/widgets/content_warning_banner.dart';
 import 'package:faio/features/common/widgets/detail_info_row.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
@@ -54,21 +55,25 @@ class IllustrationDetailRouteArgs {
   const IllustrationDetailRouteArgs({
     required this.source,
     required this.initialIndex,
+    this.skipInitialWarningPrompt = false,
   });
 
   final IllustrationSource source;
   final int initialIndex;
+  final bool skipInitialWarningPrompt;
 }
 
 class IllustrationDetailScreen extends ConsumerStatefulWidget {
   const IllustrationDetailScreen({
     required this.source,
     required this.initialIndex,
+    this.skipInitialWarningPrompt = false,
     super.key,
   });
 
   final IllustrationSource source;
   final int initialIndex;
+  final bool skipInitialWarningPrompt;
 
   @override
   ConsumerState<IllustrationDetailScreen> createState() =>
@@ -252,6 +257,8 @@ class _IllustrationDetailScreenState
             final content = items[index];
             _recordView(content);
             final isFavorite = favoriteIds.contains(content.id);
+            final shouldSkipWarning =
+                widget.skipInitialWarningPrompt && index == widget.initialIndex;
             return _IllustrationDetailView(
               key: ValueKey(content.id),
               content: content,
@@ -264,6 +271,7 @@ class _IllustrationDetailScreenState
               onOpenSource: (url) => _openSourceLink(context, url),
               primaryLink: _primarySourceLink(content),
               safetySettings: ref.watch(contentSafetySettingsProvider),
+              skipWarningPrompt: shouldSkipWarning,
             );
           },
         ),
@@ -281,6 +289,7 @@ class _IllustrationDetailView extends StatefulWidget {
     required this.onOpenSource,
     required this.primaryLink,
     required this.safetySettings,
+    this.skipWarningPrompt = false,
   });
 
   final FaioContent content;
@@ -289,6 +298,7 @@ class _IllustrationDetailView extends StatefulWidget {
   final void Function(Uri url) onOpenSource;
   final Uri? primaryLink;
   final ContentSafetySettings safetySettings;
+  final bool skipWarningPrompt;
 
   @override
   State<_IllustrationDetailView> createState() =>
@@ -311,9 +321,8 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
       rating: widget.content.rating,
       tags: widget.content.tags,
     );
-    _warningAcknowledged = widget.safetySettings.isAutoApproved(
-      _warning?.level,
-    );
+    final autoApproved = widget.safetySettings.isAutoApproved(_warning?.level);
+    _warningAcknowledged = autoApproved || widget.skipWarningPrompt;
     _favoriteBurstController = AnimationController(
       duration: const Duration(milliseconds: 420),
       vsync: this,
@@ -415,10 +424,6 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        if (warning != null) ...[
-          const SizedBox(height: 20),
-          ContentWarningBanner(warning: warning),
-        ],
         const SizedBox(height: 20),
         _buildPrimaryActions(context),
         const SizedBox(height: 20),
@@ -636,7 +641,6 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
     final updated = content.updatedAt != null
         ? _formatDateTime(content.updatedAt)
         : null;
-    final rating = content.rating.isNotEmpty ? content.rating : '未评级';
     final author = content.authorName?.isNotEmpty == true
         ? content.authorName!
         : '匿名作者';
@@ -663,7 +667,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
             spacing: 8,
             runSpacing: 8,
             children: [
-              _InfoBadge(icon: Icons.shield, label: '评级 $rating'),
+              ContentRatingBadge(warning: _warning),
               _InfoBadge(
                 icon: Icons.favorite,
                 label: '收藏 ${content.favoriteCount}',
@@ -880,6 +884,11 @@ class _IllustrationFullscreenView extends StatelessWidget {
         content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
     final highRes =
         content.originalUrl ?? content.sampleUrl ?? content.previewUrl;
+    final ratingWarning = evaluateContentWarning(
+      rating: content.rating,
+      tags: content.tags,
+    );
+    final ratingLabel = ratingWarning?.label ?? 'General';
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -923,7 +932,7 @@ class _IllustrationFullscreenView extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${content.authorName?.isNotEmpty == true ? content.authorName! : '匿名作者'} · ${content.rating.isNotEmpty ? content.rating : '未知评级'}',
+                  '${content.authorName?.isNotEmpty == true ? content.authorName! : '匿名作者'} · $ratingLabel',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: Colors.white70),

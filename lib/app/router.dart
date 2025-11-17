@@ -91,6 +91,8 @@ final appRouterProvider = Provider<GoRouter>(
                         child: IllustrationDetailScreen(
                           source: args.source,
                           initialIndex: args.initialIndex,
+                          skipInitialWarningPrompt:
+                              args.skipInitialWarningPrompt,
                         ),
                         transitionsBuilder: _detailPageTransitionBuilder,
                       );
@@ -110,10 +112,13 @@ final appRouterProvider = Provider<GoRouter>(
                         initialIndex = int.tryParse(indexParam);
                       }
                       FaioContent? initialContent;
+                      var skipInitialWarningPrompt = false;
                       final extra = state.extra;
                       if (extra is NovelDetailRouteExtra) {
                         initialContent = extra.initialContent;
                         initialIndex = extra.initialIndex ?? initialIndex;
+                        skipInitialWarningPrompt =
+                            extra.skipInitialWarningPrompt;
                       } else if (extra is FaioContent) {
                         initialContent = extra;
                       }
@@ -130,6 +135,7 @@ final appRouterProvider = Provider<GoRouter>(
                           novelId: novelId,
                           initialContent: initialContent,
                           initialIndex: initialIndex,
+                          skipInitialWarningPrompt: skipInitialWarningPrompt,
                         ),
                         transitionsBuilder: _detailPageTransitionBuilder,
                       );

@@ -910,6 +910,7 @@ class _IllustrationTile extends ConsumerWidget {
             extra: IllustrationDetailRouteArgs(
               source: source,
               initialIndex: index,
+              skipInitialWarningPrompt: gate.requiresPrompt,
             ),
           );
         },
@@ -1132,6 +1133,7 @@ class _NovelListItem extends ConsumerWidget {
           final extras = NovelDetailRouteExtra(
             initialContent: item,
             initialIndex: index,
+            skipInitialWarningPrompt: gate.requiresPrompt,
           );
           context.push('/feed/novel/$novelId?index=$index', extra: extras);
         },

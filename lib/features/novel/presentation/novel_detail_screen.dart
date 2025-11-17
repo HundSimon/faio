@@ -17,6 +17,7 @@ import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/core/preferences/content_safety_settings.dart';
 import 'package:faio/features/common/utils/content_warning.dart';
 import 'package:faio/features/common/widgets/categorized_tags.dart';
+import 'package:faio/features/common/widgets/content_rating_badge.dart';
 import 'package:faio/features/common/widgets/content_warning_banner.dart';
 import 'package:faio/features/common/widgets/detail_info_row.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
@@ -33,10 +34,15 @@ import '../providers/novel_providers.dart';
 import 'widgets/novel_series_sheet.dart';
 
 class NovelDetailRouteExtra {
-  const NovelDetailRouteExtra({this.initialContent, this.initialIndex});
+  const NovelDetailRouteExtra({
+    this.initialContent,
+    this.initialIndex,
+    this.skipInitialWarningPrompt = false,
+  });
 
   final FaioContent? initialContent;
   final int? initialIndex;
+  final bool skipInitialWarningPrompt;
 }
 
 class NovelDetailScreen extends ConsumerStatefulWidget {
@@ -44,12 +50,14 @@ class NovelDetailScreen extends ConsumerStatefulWidget {
     required this.novelId,
     this.initialContent,
     this.initialIndex,
+    this.skipInitialWarningPrompt = false,
     super.key,
   });
 
   final int novelId;
   final FaioContent? initialContent;
   final int? initialIndex;
+  final bool skipInitialWarningPrompt;
 
   @override
   ConsumerState<NovelDetailScreen> createState() => _NovelDetailScreenState();
@@ -222,6 +230,7 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
             novelId: widget.novelId,
             initialContent: widget.initialContent,
             onRecordHistory: _recordHistory,
+            skipWarningPrompt: widget.skipInitialWarningPrompt,
           );
 
     return WillPopScope(
@@ -268,11 +277,14 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
         }
         final content = items[index];
         final novelId = parseContentNumericId(content) ?? widget.novelId;
+        final skipWarningPrompt =
+            widget.skipInitialWarningPrompt && index == widget.initialIndex;
         return _NovelDetailPage(
           key: ValueKey(content.id),
           novelId: novelId,
           initialContent: content,
           onRecordHistory: _recordHistory,
+          skipWarningPrompt: skipWarningPrompt,
         );
       },
     );
@@ -285,11 +297,13 @@ class _NovelDetailPage extends ConsumerWidget {
     required this.novelId,
     this.initialContent,
     required this.onRecordHistory,
+    this.skipWarningPrompt = false,
   });
 
   final int novelId;
   final FaioContent? initialContent;
   final void Function(FaioContent content, {bool force}) onRecordHistory;
+  final bool skipWarningPrompt;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -313,6 +327,7 @@ class _NovelDetailPage extends ConsumerWidget {
         novelId: novelId,
         progressAsync: progressAsync,
         favoriteContent: historyContent,
+        skipWarningPrompt: skipWarningPrompt,
       ),
       loading: () {
         if (fallbackDetail != null) {
@@ -322,6 +337,7 @@ class _NovelDetailPage extends ConsumerWidget {
             novelId: novelId,
             progressAsync: progressAsync,
             favoriteContent: historyContent,
+            skipWarningPrompt: skipWarningPrompt,
           );
         }
         return _NovelDetailSkeleton(initialContent: initialContent);
@@ -458,11 +474,13 @@ class _NovelDetailError extends StatelessWidget {
 
 class _NovelDetailContent extends ConsumerStatefulWidget {
   const _NovelDetailContent({
+    super.key,
     required this.detail,
     required this.initialContent,
     required this.novelId,
     required this.progressAsync,
     this.favoriteContent,
+    this.skipWarningPrompt = false,
   });
 
   final NovelDetail detail;
@@ -470,6 +488,7 @@ class _NovelDetailContent extends ConsumerStatefulWidget {
   final int novelId;
   final AsyncValue<NovelReadingProgress?> progressAsync;
   final FaioContent? favoriteContent;
+  final bool skipWarningPrompt;
 
   @override
   ConsumerState<_NovelDetailContent> createState() =>
@@ -523,7 +542,8 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
         widget.favoriteContent?.rating ?? widget.initialContent?.rating ?? '';
     _warning = evaluateContentWarning(rating: rating, tags: tags);
     final settings = ref.read(contentSafetySettingsProvider);
-    _warningAcknowledged = settings.isAutoApproved(_warning?.level);
+    final autoApproved = settings.isAutoApproved(_warning?.level);
+    _warningAcknowledged = autoApproved || widget.skipWarningPrompt;
   }
 
   @override
@@ -649,16 +669,13 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
                   aspectRatio: 0.68,
                 ),
               );
-              final statBadges = <Widget>[];
+              final statBadges = <Widget>[
+                ContentRatingBadge(
+                  warning: _warning,
+                  icon: Icons.shield_outlined,
+                ),
+              ];
               final contentLength = detail.length ?? detail.body.length;
-              if (favoriteEntry.rating.isNotEmpty) {
-                statBadges.add(
-                  _InfoPill(
-                    icon: Icons.shield_outlined,
-                    label: '评级 ${favoriteEntry.rating}',
-                  ),
-                );
-              }
               if (detail.readCount != null && detail.readCount! > 0) {
                 statBadges.add(
                   _InfoPill(
@@ -851,10 +868,6 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
         children: [
           buildHeaderSection(),
-          if (warning != null) ...[
-            const SizedBox(height: 16),
-            ContentWarningBanner(warning: warning),
-          ],
           const SizedBox(height: 16),
           _ReadActionCard(
             detail: detail,
