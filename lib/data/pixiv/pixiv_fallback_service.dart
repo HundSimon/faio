@@ -49,6 +49,44 @@ class PixivFallbackService implements PixivService {
   }
 
   @override
+  Future<PixivPage<PixivIllust>> searchIllustrations({
+    required String query,
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    try {
+      return await _primary.searchIllustrations(
+        query: query,
+        offset: offset,
+        limit: limit,
+      );
+    } catch (_) {
+      return _fallback.searchIllustrations(
+        query: query,
+        offset: offset,
+        limit: limit,
+      );
+    }
+  }
+
+  @override
+  Future<PixivPage<PixivNovel>> searchNovels({
+    required String query,
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    try {
+      return await _primary.searchNovels(
+        query: query,
+        offset: offset,
+        limit: limit,
+      );
+    } catch (_) {
+      return _fallback.searchNovels(query: query, offset: offset, limit: limit);
+    }
+  }
+
+  @override
   Future<PixivIllust?> fetchIllustrationDetail(int illustId) async {
     try {
       final result = await _primary.fetchIllustrationDetail(illustId);

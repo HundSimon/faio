@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../domain/models/content_item.dart';
 import '../providers/search_providers.dart';
 
 /// Early prototype of unified search UI.
@@ -77,14 +78,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = items[index];
-                      return ListTile(
-                        title: Text(item.title),
-                        subtitle: Text('${item.source} · ${item.rating}'),
-                        trailing: const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 16,
-                        ),
-                      );
+                      return _SearchResultTile(item: item);
                     },
                   );
                 },
@@ -97,5 +91,93 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
       ),
     );
+  }
+}
+
+class _SearchResultTile extends StatelessWidget {
+  const _SearchResultTile({required this.item});
+
+  final FaioContent item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final summary = item.summary.trim().isEmpty ? null : item.summary.trim();
+    final author = item.authorName?.trim();
+    final metadataStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: _buildLeading(theme),
+        title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${item.source} · ${_typeLabel(item.type)} · ${item.rating}',
+              style: metadataStyle,
+            ),
+            if (author != null && author.isNotEmpty)
+              Text(author, style: theme.textTheme.bodySmall),
+            if (summary != null)
+              Text(
+                summary,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: metadataStyle,
+              ),
+          ],
+        ),
+        trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      ),
+    );
+  }
+
+  Widget _buildLeading(ThemeData theme) {
+    final (background, foreground) = _badgeColors(theme.colorScheme);
+    final iconData = _iconForType(item.type);
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: background,
+      foregroundColor: foreground,
+      child: Icon(iconData),
+    );
+  }
+
+  (Color, Color) _badgeColors(ColorScheme scheme) {
+    return switch (item.type) {
+      ContentType.novel => (
+        scheme.secondaryContainer,
+        scheme.onSecondaryContainer,
+      ),
+      ContentType.comic => (
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+      ),
+      _ => (scheme.primaryContainer, scheme.onPrimaryContainer),
+    };
+  }
+
+  static IconData _iconForType(ContentType type) {
+    return switch (type) {
+      ContentType.novel => Icons.menu_book_rounded,
+      ContentType.comic => Icons.collections_bookmark,
+      ContentType.audio => Icons.graphic_eq_rounded,
+      _ => Icons.image,
+    };
+  }
+
+  static String _typeLabel(ContentType type) {
+    return switch (type) {
+      ContentType.novel => '小说',
+      ContentType.comic => '漫画',
+      ContentType.audio => '音频',
+      _ => '插画',
+    };
   }
 }

@@ -102,6 +102,63 @@ class PixivHttpService implements PixivService {
   }
 
   @override
+  Future<PixivPage<PixivIllust>> searchIllustrations({
+    required String query,
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return const PixivPage<PixivIllust>(items: []);
+    }
+    final response = await _getJson(
+      path: '/v1/search/illust',
+      queryParameters: {
+        'word': trimmed,
+        'search_target': 'partial_match_for_tags',
+        'sort': 'date_desc',
+        'offset': offset,
+        'filter': 'for_android',
+      },
+    );
+    final illusts = parsePixivIllustList(response['illusts']);
+    final nextUrl = response['next_url'] as String?;
+    return PixivPage<PixivIllust>(
+      items: illusts.take(limit).toList(),
+      nextUrl: nextUrl,
+    );
+  }
+
+  @override
+  Future<PixivPage<PixivNovel>> searchNovels({
+    required String query,
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return const PixivPage<PixivNovel>(items: []);
+    }
+    final response = await _getJson(
+      path: '/v1/search/novel',
+      queryParameters: {
+        'word': trimmed,
+        'search_target': 'partial_match_for_tags',
+        'sort': 'date_desc',
+        'offset': offset,
+        'filter': 'for_android',
+        'include_translated_tag_results': 'true',
+      },
+    );
+    final novels = parsePixivNovelList(response['novels']);
+    final nextUrl = response['next_url'] as String?;
+    return PixivPage<PixivNovel>(
+      items: novels.take(limit).toList(),
+      nextUrl: nextUrl,
+    );
+  }
+
+  @override
   Future<PixivIllust?> fetchIllustrationDetail(int illustId) async {
     final response = await _getJson(
       path: '/v1/illust/detail',

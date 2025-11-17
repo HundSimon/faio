@@ -77,6 +77,48 @@ class PixivMockService implements PixivService {
     }
     return null;
   }
+
+  @override
+  Future<PixivPage<PixivIllust>> searchIllustrations({
+    required String query,
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    if (query.trim().isEmpty) {
+      return const PixivPage<PixivIllust>(items: []);
+    }
+    final filtered = _illustrations
+        .where((illust) => _matchesIllust(query, illust))
+        .toList();
+    final slice = _slice(filtered, offset, limit);
+    return PixivPage<PixivIllust>(
+      items: slice.items,
+      nextUrl: slice.hasNext
+          ? 'mock://pixiv/search/illust?offset=${slice.nextOffset}'
+          : null,
+    );
+  }
+
+  @override
+  Future<PixivPage<PixivNovel>> searchNovels({
+    required String query,
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    if (query.trim().isEmpty) {
+      return const PixivPage<PixivNovel>(items: []);
+    }
+    final filtered = _novels
+        .where((novel) => _matchesNovel(query, novel))
+        .toList();
+    final slice = _slice(filtered, offset, limit);
+    return PixivPage<PixivNovel>(
+      items: slice.items,
+      nextUrl: slice.hasNext
+          ? 'mock://pixiv/search/novel?offset=${slice.nextOffset}'
+          : null,
+    );
+  }
 }
 
 class _SliceResult<T> {
@@ -99,6 +141,37 @@ _SliceResult<T> _slice<T>(List<T> source, int offset, int limit) {
   final items = source.sublist(offset, end);
   final hasNext = end < source.length;
   return _SliceResult<T>(items: items, hasNext: hasNext, nextOffset: end);
+}
+
+bool _matchesIllust(String query, PixivIllust illust) {
+  final normalized = query.trim().toLowerCase();
+  if (normalized.isEmpty) {
+    return false;
+  }
+  if (illust.title.toLowerCase().contains(normalized)) {
+    return true;
+  }
+  if (illust.caption.toLowerCase().contains(normalized)) {
+    return true;
+  }
+  return illust.tags.any((tag) => tag.name.toLowerCase().contains(normalized));
+}
+
+bool _matchesNovel(String query, PixivNovel novel) {
+  final normalized = query.trim().toLowerCase();
+  if (normalized.isEmpty) {
+    return false;
+  }
+  if (novel.title.toLowerCase().contains(normalized)) {
+    return true;
+  }
+  if (novel.caption.toLowerCase().contains(normalized)) {
+    return true;
+  }
+  if (novel.user.name.toLowerCase().contains(normalized)) {
+    return true;
+  }
+  return novel.tags.any((tag) => tag.name.toLowerCase().contains(normalized));
 }
 
 List<PixivIllust> _buildIllustrations() {

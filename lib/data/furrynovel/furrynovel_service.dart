@@ -60,6 +60,28 @@ class FurryNovelService {
     return null;
   }
 
+  Future<FurryNovelPage> searchNovels({
+    required String keyword,
+    int page = 1,
+    int limit = 30,
+  }) async {
+    final trimmedKeyword = keyword.trim();
+    if (trimmedKeyword.isEmpty) {
+      return FurryNovelPage(items: const [], page: 1, pageSize: limit);
+    }
+    final safePage = page <= 0 ? 1 : page;
+    final encoded = Uri.encodeComponent(trimmedKeyword);
+    final response = await _getJson(
+      '/pixiv/search/novel/$encoded/cache',
+      queryParameters: {'page': safePage},
+    );
+    return FurryNovelPage.fromResponse(
+      response,
+      page: safePage,
+      pageSizeHint: limit,
+    );
+  }
+
   Future<dynamic> _getJson(
     String path, {
     Map<String, dynamic>? queryParameters,

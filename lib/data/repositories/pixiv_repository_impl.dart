@@ -101,6 +101,63 @@ class PixivRepositoryImpl implements PixivRepository {
   }
 
   @override
+  Future<List<FaioContent>> searchIllustrations({
+    required String query,
+    int limit = 30,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return const [];
+    }
+    final response = await _service.searchIllustrations(
+      query: trimmed,
+      limit: limit,
+    );
+    final rawItems = response.items
+        .map(ContentMapper.fromPixivIllust)
+        .whereType<FaioContent>()
+        .toList();
+    final items = _filterItems(rawItems)
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    if (items.length > limit) {
+      return items.sublist(0, limit);
+    }
+    return items;
+  }
+
+  @override
+  Future<List<FaioContent>> searchNovels({
+    required String query,
+    int limit = 30,
+    bool includePixiv = true,
+    bool includeFurryNovel = true,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty || (!includePixiv && !includeFurryNovel)) {
+      return const [];
+    }
+
+    final futures = <Future<List<FaioContent>>>[];
+    if (includePixiv) {
+      futures.add(_searchPixivNovels(trimmed, limit));
+    }
+    if (includeFurryNovel) {
+      futures.add(_searchFurryNovels(trimmed, limit));
+    }
+    if (futures.isEmpty) {
+      return const [];
+    }
+
+    final results = await Future.wait(futures);
+    final combined = results.expand((list) => list).toList()
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    if (combined.length > limit) {
+      return combined.sublist(0, limit);
+    }
+    return combined;
+  }
+
+  @override
   Future<FaioContent?> fetchIllustrationDetail(int illustId) async {
     final illust = await _service.fetchIllustrationDetail(illustId);
     if (illust == null) {
@@ -133,6 +190,27 @@ class PixivRepositoryImpl implements PixivRepository {
   Future<NovelSeriesDetail?> fetchNovelSeries(int seriesId) async {
     final series = await _furryNovelService.fetchSeries(seriesId);
     return NovelMapper.fromFurrySeries(series);
+  }
+
+  Future<List<FaioContent>> _searchPixivNovels(String query, int limit) async {
+    final response = await _service.searchNovels(query: query, limit: limit);
+    final rawItems = response.items
+        .map(ContentMapper.fromPixivNovel)
+        .whereType<FaioContent>()
+        .toList();
+    return _filterItems(rawItems);
+  }
+
+  Future<List<FaioContent>> _searchFurryNovels(String query, int limit) async {
+    final page = await _furryNovelService.searchNovels(
+      keyword: query,
+      limit: limit,
+    );
+    final rawItems = page.items
+        .map(ContentMapper.fromFurryNovel)
+        .whereType<FaioContent>()
+        .toList();
+    return _filterItems(rawItems);
   }
 
   int _offsetForPage(int page, int limit) {

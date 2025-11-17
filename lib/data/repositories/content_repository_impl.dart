@@ -136,29 +136,103 @@ class ContentRepositoryImpl implements ContentRepository {
     Iterable<String> tags = const [],
     Iterable<String> sources = const [],
   }) async {
-    if (sources.isNotEmpty && !sources.contains('e621')) {
+    final normalizedQuery = query.trim();
+    final normalizedTags = tags
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList(growable: false);
+    final normalizedSources = sources
+        .map((source) => source.trim().toLowerCase())
+        .where((source) => source.isNotEmpty)
+        .toSet();
+
+    if (normalizedQuery.isEmpty && normalizedTags.isEmpty) {
       return const [];
     }
 
-    final normalizedTags = tags.toList();
-    if (normalizedTags.isNotEmpty) {
-      final posts = await _e621Service.fetchPosts(tags: normalizedTags);
-      final items = posts
-          .map(ContentMapper.fromE621)
-          .whereType<FaioContent>()
-          .toList();
-      final filtered = _filterItems(items);
-      filtered.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-      return filtered;
+    final searchAllSources = normalizedSources.isEmpty;
+    final includeE621 = searchAllSources || normalizedSources.contains('e621');
+    final includePixiv =
+        searchAllSources || normalizedSources.contains('pixiv');
+    final includeFurry =
+        searchAllSources ||
+        normalizedSources.contains('furrynovel') ||
+        normalizedSources.contains('furry');
+
+    final tasks = <Future<List<FaioContent>>>[];
+    final errors = <Object>[];
+    final stacks = <StackTrace>[];
+
+    Future<List<FaioContent>> safeFetch(
+      Future<List<FaioContent>> Function() fn,
+    ) async {
+      try {
+        return await fn();
+      } catch (error, stackTrace) {
+        errors.add(error);
+        stacks.add(stackTrace);
+        return const [];
+      }
     }
 
-    final posts = await _e621Service.searchPosts(query: query);
-    final items = posts
-        .map(ContentMapper.fromE621)
-        .whereType<FaioContent>()
-        .toList();
-    final filtered = _filterItems(items);
-    filtered.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    if (includeE621 &&
+        (normalizedQuery.isNotEmpty || normalizedTags.isNotEmpty)) {
+      tasks.add(
+        safeFetch(
+          () => _searchE621(query: normalizedQuery, tags: normalizedTags),
+        ),
+      );
+    }
+
+    if (includePixiv && normalizedQuery.isNotEmpty) {
+      tasks.add(
+        safeFetch(
+          () => _pixivRepository.searchIllustrations(
+            query: normalizedQuery,
+            limit: 30,
+          ),
+        ),
+      );
+    }
+
+    if ((includePixiv || includeFurry) && normalizedQuery.isNotEmpty) {
+      tasks.add(
+        safeFetch(
+          () => _pixivRepository.searchNovels(
+            query: normalizedQuery,
+            limit: 30,
+            includePixiv: includePixiv,
+            includeFurryNovel: includeFurry,
+          ),
+        ),
+      );
+    }
+
+    if (tasks.isEmpty) {
+      return const [];
+    }
+
+    final results = await Future.wait(tasks);
+    final combined = results.expand((list) => list).toList();
+
+    if (combined.isEmpty && errors.isNotEmpty) {
+      Error.throwWithStackTrace(errors.first, stacks.first);
+    }
+
+    combined.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    final deduped = <FaioContent>[];
+    final seenIds = <String>{};
+    for (final item in combined) {
+      if (seenIds.add(item.id)) {
+        deduped.add(item);
+      }
+    }
+
+    final filtered = _filterItems(deduped);
+    const maxResults = 60;
+    if (filtered.length > maxResults) {
+      return filtered.sublist(0, maxResults);
+    }
     return filtered;
   }
 
@@ -197,6 +271,27 @@ class ContentRepositoryImpl implements ContentRepository {
     return result.items
         .where((item) => item.type == ContentType.illustration)
         .toList();
+  }
+
+  Future<List<FaioContent>> _searchE621({
+    required String query,
+    required List<String> tags,
+    int limit = 40,
+  }) async {
+    final posts = tags.isNotEmpty
+        ? await _e621Service.fetchPosts(limit: limit, tags: tags)
+        : await _e621Service.searchPosts(query: query, limit: limit);
+
+    final items = posts
+        .map(ContentMapper.fromE621)
+        .whereType<FaioContent>()
+        .toList();
+    final filtered = _filterItems(items)
+      ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    if (filtered.length > limit) {
+      return filtered.sublist(0, limit);
+    }
+    return filtered;
   }
 
   List<FaioContent> _filterItems(List<FaioContent> items) {
