@@ -603,53 +603,6 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
       );
     }
 
-    Widget? buildHeaderActions({
-      required bool isCompact,
-      required double maxWidth,
-    }) {
-      final baseCount = favoriteEntry.favoriteCount;
-      final displayCount = baseCount + (isFavorite ? 1 : 0);
-      final favoriteLabel = '${isFavorite ? '已收藏' : '收藏'}（$displayCount）';
-      final buttons = <Widget>[
-        FilledButton.icon(
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          ),
-          icon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            transitionBuilder: (child, animation) =>
-                ScaleTransition(scale: animation, child: child),
-            child: Icon(
-              isFavorite ? Icons.favorite : Icons.favorite_border,
-              key: ValueKey(isFavorite),
-            ),
-          ),
-          label: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: Text(favoriteLabel, key: ValueKey(favoriteLabel)),
-          ),
-          onPressed: () {
-            ref
-                .read(libraryFavoritesProvider.notifier)
-                .toggleContentFavorite(favoriteEntry);
-          },
-        ),
-      ];
-      if (buttons.isEmpty) {
-        return null;
-      }
-      return Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: buttons
-            .map(
-              (button) =>
-                  isCompact ? SizedBox(width: maxWidth, child: button) : button,
-            )
-            .toList(),
-      );
-    }
-
     Widget buildHeaderSection() {
       return Card(
         margin: EdgeInsets.zero,
@@ -659,65 +612,44 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final isCompact = constraints.maxWidth < 520;
-              final coverWidth = math
-                  .min(isCompact ? constraints.maxWidth * 0.55 : 220, 220.0)
-                  .toDouble();
+              final coverWidth = math.min(
+                constraints.maxWidth * (isCompact ? 0.42 : 0.32),
+                220.0,
+              );
               final cover = SizedBox(
                 width: coverWidth,
                 child: buildHero(
-                  height: isCompact ? 180 : 220,
+                  height: isCompact ? null : 220,
                   aspectRatio: 0.68,
                 ),
               );
-              final statBadges = <Widget>[
+              final infoSpacing = isCompact ? 12.0 : 24.0;
+              final ratingBadges = <Widget>[
                 ContentRatingBadge(
                   warning: _warning,
                   icon: Icons.shield_outlined,
                 ),
               ];
+              final statPills = <Widget>[];
               final contentLength = detail.length ?? detail.body.length;
               if (detail.readCount != null && detail.readCount! > 0) {
-                statBadges.add(
+                final formattedReadCount = _formatCompactNumber(detail.readCount!);
+                statPills.add(
                   _InfoPill(
                     icon: Icons.visibility_outlined,
-                    label: '${detail.readCount} 阅读',
-                  ),
-                );
-              }
-              final metaRows = <Widget>[];
-              if (publishedAt != null) {
-                metaRows.add(
-                  DetailInfoRow(
-                    icon: Icons.schedule,
-                    label: '发布时间',
-                    value: _formatDate(publishedAt),
-                  ),
-                );
-              }
-              if (detail.updatedAt != null) {
-                metaRows.add(
-                  DetailInfoRow(
-                    icon: Icons.update,
-                    label: '最近更新',
-                    value: _formatDate(detail.updatedAt!),
-                    subtle: true,
+                    label: '$formattedReadCount 阅读',
                   ),
                 );
               }
               if (contentLength > 0) {
-                metaRows.add(
-                  DetailInfoRow(
+                final formattedLength = _formatCompactNumber(contentLength);
+                statPills.add(
+                  _InfoPill(
                     icon: Icons.text_snippet_outlined,
-                    label: '内容篇幅',
-                    value: '约 $contentLength 字',
-                    subtle: true,
+                    label: '约$formattedLength字',
                   ),
                 );
               }
-              final headerActions = buildHeaderActions(
-                isCompact: isCompact,
-                maxWidth: constraints.maxWidth,
-              );
               Widget buildInfoColumn() {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,51 +667,132 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (statBadges.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(spacing: 8, runSpacing: 8, children: statBadges),
-                    ],
-                    if (metaRows.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (var i = 0; i < metaRows.length; i++) ...[
-                            metaRows[i],
-                            if (i < metaRows.length - 1)
-                              const SizedBox(height: 8),
-                          ],
+                  ],
+                );
+              }
+
+              Widget? buildBadgesRow() {
+                final badges = <Widget>[];
+                badges.addAll(ratingBadges);
+                badges.addAll(statPills);
+                if (badges.isEmpty) {
+                  return null;
+                }
+                return Padding(
+                  padding: EdgeInsets.only(top: isCompact ? 12 : 16),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < badges.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          badges[i],
                         ],
-                      ),
-                    ],
-                    if (headerActions != null) ...[
-                      const SizedBox(height: 16),
-                      headerActions,
-                    ],
-                  ],
+                      ],
+                    ),
+                  ),
                 );
               }
 
-              if (isCompact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Align(alignment: Alignment.center, child: cover),
-                    const SizedBox(height: 16),
-                    buildInfoColumn(),
-                  ],
-                );
-              }
+              final badgesRow = buildBadgesRow();
 
-              return Row(
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  cover,
-                  const SizedBox(width: 24),
-                  Expanded(child: buildInfoColumn()),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      cover,
+                      SizedBox(width: infoSpacing),
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(right: infoSpacing),
+                          child: buildInfoColumn(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (badgesRow != null) badgesRow,
                 ],
               );
             },
+          ),
+        ),
+      );
+    }
+
+    Widget buildFavoriteCard(BuildContext context) {
+      final baseCount = favoriteEntry.favoriteCount;
+      final displayCount = baseCount + (isFavorite ? 1 : 0);
+      final favoriteLabel = '${isFavorite ? '已收藏' : '收藏'}（$displayCount）';
+      Uri? pickPrimaryLink(List<Uri> links) {
+        if (links.isEmpty) return null;
+        return links.firstWhere(
+          (link) => link.host.contains('pixiv'),
+          orElse: () => links.first,
+        );
+      }
+
+      final primaryLink =
+          pickPrimaryLink(detail.sourceLinks) ??
+          pickPrimaryLink(favoriteEntry.sourceLinks) ??
+          (detail.source == 'pixiv'
+              ? Uri.https(
+                  'www.pixiv.net',
+                  '/novel/show.php',
+                  {'id': detail.novelId.toString()},
+                )
+              : null);
+      return Card(
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                  ),
+                  icon: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    transitionBuilder: (child, animation) =>
+                        ScaleTransition(scale: animation, child: child),
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      key: ValueKey(isFavorite),
+                    ),
+                  ),
+                  label: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    child: Text(favoriteLabel, key: ValueKey(favoriteLabel)),
+                  ),
+                  onPressed: () {
+                    ref
+                        .read(libraryFavoritesProvider.notifier)
+                        .toggleContentFavorite(favoriteEntry);
+                  },
+                ),
+              ),
+              if (primaryLink != null) ...[
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('查看原站'),
+                    onPressed: () => _launchExternal(context, primaryLink),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 52),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       );
@@ -792,6 +805,44 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
       return DetailSectionCard(
         title: '标签',
         child: CategorizedTagList(tags: tags),
+      );
+    }
+
+    Widget? buildTimelineCard() {
+      final rows = <Widget>[];
+      if (publishedAt != null) {
+        rows.add(
+          DetailInfoRow(
+            icon: Icons.schedule,
+            label: '发布时间',
+            value: _formatDate(publishedAt),
+          ),
+        );
+      }
+      if (detail.updatedAt != null) {
+        rows.add(
+          DetailInfoRow(
+            icon: Icons.update,
+            label: '最近更新',
+            value: _formatDate(detail.updatedAt!),
+            subtle: true,
+          ),
+        );
+      }
+      if (rows.isEmpty) {
+        return null;
+      }
+      return DetailSectionCard(
+        title: '时间信息',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < rows.length; i++) ...[
+              rows[i],
+              if (i < rows.length - 1) const SizedBox(height: 12),
+            ],
+          ],
+        ),
       );
     }
 
@@ -858,6 +909,8 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
       );
     }
 
+    final timelineCard = buildTimelineCard();
+
     final listView = RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(novelDetailProvider(novelId));
@@ -868,6 +921,8 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
         children: [
           buildHeaderSection(),
+          const SizedBox(height: 12),
+          buildFavoriteCard(context),
           const SizedBox(height: 16),
           _ReadActionCard(
             detail: detail,
@@ -924,6 +979,10 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
               series: detail.series!,
               currentNovelId: novelId,
             ),
+          ],
+          if (timelineCard != null) ...[
+            const SizedBox(height: 16),
+            timelineCard,
           ],
           if (detail.sourceLinks.isNotEmpty) ...[
             const SizedBox(height: 16),
@@ -1402,6 +1461,22 @@ String _formatRelativeTime(DateTime dateTime) {
   }
   final years = (diff.inDays / 365).floor();
   return '$years 年前';
+}
+
+String _formatCompactNumber(int value) {
+  String format(double number) {
+    final showDecimal = number < 10 && (number % 1) != 0;
+    final text = showDecimal ? number.toStringAsFixed(1) : number.toStringAsFixed(0);
+    return text.endsWith('.0') ? text.substring(0, text.length - 2) : text;
+  }
+
+  if (value >= 1000000) {
+    return '${format(value / 1000000)}m';
+  }
+  if (value >= 1000) {
+    return '${format(value / 1000)}k';
+  }
+  return value.toString();
 }
 
 class _InfoPill extends StatelessWidget {
