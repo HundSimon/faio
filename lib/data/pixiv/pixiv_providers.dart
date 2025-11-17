@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rhttp/rhttp.dart';
 
 import '../../core/network/rate_limiter.dart';
+import '../../core/tagging/tag_preferences_provider.dart';
 import '../../domain/repositories/pixiv_repository.dart';
 import '../furrynovel/furrynovel_providers.dart';
 import '../repositories/pixiv_repository_impl.dart';
@@ -75,9 +76,11 @@ final pixivServiceProvider = Provider<PixivService>((ref) {
 final pixivRepositoryProvider = Provider<PixivRepository>((ref) {
   final service = ref.watch(pixivServiceProvider);
   final furryNovelService = ref.watch(furryNovelServiceProvider);
+  final tagFilterResolver = () => ref.read(tagFilterProvider);
   return PixivRepositoryImpl(
     service: service,
     furryNovelService: furryNovelService,
+    tagFilterResolver: tagFilterResolver,
   );
 }, name: 'pixivRepositoryProvider');
 

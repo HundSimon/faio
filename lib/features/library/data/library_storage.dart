@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../domain/models/content_item.dart';
+import '../../../domain/models/content_tag.dart';
 import '../domain/library_entries.dart';
 
 class LibraryStorage {
   LibraryStorage({Future<SharedPreferences>? prefsFuture})
-      : _prefsFuture = prefsFuture ?? SharedPreferences.getInstance();
+    : _prefsFuture = prefsFuture ?? SharedPreferences.getInstance();
 
   final Future<SharedPreferences> _prefsFuture;
 
@@ -114,18 +115,13 @@ LibraryFavoriteEntry? _decodeFavorite(Map<String, dynamic>? json) {
 
   switch (kind) {
     case LibraryFavoriteKind.content:
-      final content =
-          _decodeContent(json['content'] as Map<String, dynamic>?);
+      final content = _decodeContent(json['content'] as Map<String, dynamic>?);
       if (content == null) {
         return null;
       }
-      return LibraryFavoriteEntry.content(
-        content: content,
-        savedAt: savedAt,
-      );
+      return LibraryFavoriteEntry.content(content: content, savedAt: savedAt);
     case LibraryFavoriteKind.series:
-      final series =
-          _decodeSeries(json['series'] as Map<String, dynamic>?);
+      final series = _decodeSeries(json['series'] as Map<String, dynamic>?);
       if (series == null) {
         return null;
       }
@@ -149,8 +145,7 @@ LibraryHistoryEntry? _decodeHistory(Map<String, dynamic>? json) {
   if (viewedAt == null) {
     return null;
   }
-  final content =
-      _decodeContent(json['content'] as Map<String, dynamic>?);
+  final content = _decodeContent(json['content'] as Map<String, dynamic>?);
   if (content == null) {
     return null;
   }
@@ -172,7 +167,7 @@ Map<String, dynamic>? _encodeContent(FaioContent content) {
     'updatedAt': content.updatedAt?.toIso8601String(),
     'rating': content.rating,
     'authorName': content.authorName,
-    'tags': content.tags,
+    'tags': content.tags.map((tag) => tag.toJson()).toList(),
     'favoriteCount': content.favoriteCount,
     'sourceLinks': content.sourceLinks.map((uri) => uri.toString()).toList(),
   };
@@ -225,9 +220,7 @@ FaioContent? _decodeContent(Map<String, dynamic>? json) {
     updatedAt: _tryParseDate(json['updatedAt'] as String?),
     rating: rating,
     authorName: json['authorName'] as String?,
-    tags: (json['tags'] as List<dynamic>? ?? const [])
-        .map((e) => e.toString())
-        .toList(),
+    tags: _decodeTags(json['tags']),
     favoriteCount: json['favoriteCount'] is num
         ? (json['favoriteCount'] as num).toInt()
         : 0,
@@ -236,6 +229,26 @@ FaioContent? _decodeContent(Map<String, dynamic>? json) {
         .whereType<Uri>()
         .toList(),
   );
+}
+
+List<ContentTag> _decodeTags(dynamic raw) {
+  if (raw is List) {
+    final tags = <ContentTag>[];
+    for (final entry in raw) {
+      if (entry is Map<String, dynamic>) {
+        final tag = ContentTag.fromJson(entry);
+        if (tag.canonicalName.isNotEmpty) {
+          tags.add(tag);
+        }
+      } else if (entry is String && entry.trim().isNotEmpty) {
+        tags.add(ContentTag.fromLabels(primary: entry));
+      } else if (entry != null) {
+        tags.add(ContentTag.fromLabels(primary: entry.toString()));
+      }
+    }
+    return tags;
+  }
+  return const <ContentTag>[];
 }
 
 Map<String, dynamic> _encodeSeries(LibrarySeriesFavorite series) {

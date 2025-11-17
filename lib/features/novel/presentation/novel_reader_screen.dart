@@ -99,7 +99,9 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
     final ratio = progress.relativeOffset.clamp(0.0, 1.0);
     final absolute = progress.absoluteOffset;
     final savedContent = progress.contentExtent;
-    if (_cachedContentExtent == null && savedContent != null && savedContent > 0) {
+    if (_cachedContentExtent == null &&
+        savedContent != null &&
+        savedContent > 0) {
       _cachedContentExtent = savedContent;
     }
     if (ratio <= 0 && (absolute == null || absolute <= 0)) {
@@ -216,60 +218,60 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                                 vertical: 24,
                               ),
                               sliver: SliverList(
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    if (index == 0) {
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
+                                delegate: SliverChildBuilderDelegate((
+                                  context,
+                                  index,
+                                ) {
+                                  if (index == 0) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          detail.title,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleLarge
+                                              ?.copyWith(
+                                                color: textColor,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                        if (detail.authorName != null) ...[
+                                          const SizedBox(height: 4),
                                           Text(
-                                            detail.title,
+                                            detail.authorName!,
                                             style: Theme.of(context)
                                                 .textTheme
-                                                .titleLarge
+                                                .bodyMedium
                                                 ?.copyWith(
-                                                  color: textColor,
-                                                  fontWeight: FontWeight.w700,
+                                                  color: palette.subtleText,
                                                 ),
                                           ),
-                                          if (detail.authorName != null) ...[
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              detail.authorName!,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodyMedium
-                                                  ?.copyWith(
-                                                    color: palette.subtleText,
-                                                  ),
-                                            ),
-                                          ],
-                                          const SizedBox(height: 16),
                                         ],
-                                      );
-                                    }
-                                    final paragraphIndex = index - 1;
-                                    final paragraph = paragraphs[paragraphIndex];
-                                    return Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: settings.paragraphSpacing,
-                                      ),
-                                      child: Text(
-                                        paragraph,
-                                        style: TextStyle(
-                                          fontSize: settings.fontSize,
-                                          height: settings.lineHeight,
-                                          fontFamily: _fontFamilyFor(
-                                            settings.fontFamily,
-                                          ),
-                                          color: textColor,
-                                        ),
-                                      ),
+                                        const SizedBox(height: 16),
+                                      ],
                                     );
-                                  },
-                                  childCount: contentCount,
-                                ),
+                                  }
+                                  final paragraphIndex = index - 1;
+                                  final paragraph = paragraphs[paragraphIndex];
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: settings.paragraphSpacing,
+                                    ),
+                                    child: Text(
+                                      paragraph,
+                                      style: TextStyle(
+                                        fontSize: settings.fontSize,
+                                        height: settings.lineHeight,
+                                        fontFamily: _fontFamilyFor(
+                                          settings.fontFamily,
+                                        ),
+                                        color: textColor,
+                                      ),
+                                    ),
+                                  );
+                                }, childCount: contentCount),
                               ),
                             ),
                           ],
@@ -325,12 +327,12 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
       return;
     }
     final widthChanged =
-        _cachedLayoutWidth == null || (_cachedLayoutWidth! - maxWidth).abs() > 0.5;
+        _cachedLayoutWidth == null ||
+        (_cachedLayoutWidth! - maxWidth).abs() > 0.5;
     final settingsChanged =
         _cachedLayoutSettings == null || _cachedLayoutSettings != settings;
-    final needsRecompute = _cachedContentExtent == null ||
-        widthChanged ||
-        settingsChanged;
+    final needsRecompute =
+        _cachedContentExtent == null || widthChanged || settingsChanged;
     if (!needsRecompute) {
       return;
     }
@@ -349,30 +351,24 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
     double paragraphTotal = 0;
     for (final paragraph in paragraphs) {
       painter
-        ..text = TextSpan(
-          text: paragraph,
-          style: paragraphStyle,
-        )
+        ..text = TextSpan(text: paragraph, style: paragraphStyle)
         ..layout(maxWidth: maxWidth);
       final height = painter.size.height + settings.paragraphSpacing;
       paragraphTotal += height;
     }
 
     double headerHeight = 0;
-    final titleStyle = theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-        ) ??
-        TextStyle(
-          fontSize: settings.fontSize + 2,
-          fontWeight: FontWeight.w700,
-        );
+    final titleStyle =
+        theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700) ??
+        TextStyle(fontSize: settings.fontSize + 2, fontWeight: FontWeight.w700);
     painter
       ..text = TextSpan(text: detail.title, style: titleStyle)
       ..layout(maxWidth: maxWidth);
     headerHeight += painter.size.height;
     if (detail.authorName != null) {
       headerHeight += 4;
-      final authorStyle = theme.textTheme.bodyMedium ??
+      final authorStyle =
+          theme.textTheme.bodyMedium ??
           TextStyle(
             fontSize: settings.fontSize - 2,
             height: settings.lineHeight,
@@ -439,13 +435,16 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
       fallbackMax: max,
     );
     final contentExtent = _effectiveContentExtent(viewport, max);
-    final scrollableExtent =
-        (contentExtent - viewport).clamp(0.0, double.infinity);
+    final scrollableExtent = (contentExtent - viewport).clamp(
+      0.0,
+      double.infinity,
+    );
     final thumbExtent = contentExtent <= 0
         ? 1.0
         : (viewport / contentExtent).clamp(0.05, 1.0);
     final hasScrollable = scrollableExtent > 1;
-    final shouldUpdate = force ||
+    final shouldUpdate =
+        force ||
         !_nearEquals(_currentScrollRatio, ratio) ||
         !_nearEquals(_scrollThumbExtentRatio, thumbExtent) ||
         _hasScrollableContent != hasScrollable;
@@ -482,8 +481,7 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
 
   double _effectiveContentExtent(double viewport, double fallbackMax) {
     final cached = _cachedContentExtent;
-    final fallback =
-        (fallbackMax + viewport).clamp(viewport, double.infinity);
+    final fallback = (fallbackMax + viewport).clamp(viewport, double.infinity);
     if (cached == null || !cached.isFinite) {
       return fallback;
     }
@@ -676,11 +674,7 @@ class _NovelReaderSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    Widget line({
-      double height = 14,
-      double? width,
-      double radius = 6,
-    }) {
+    Widget line({double height = 14, double? width, double radius = 6}) {
       return Skeleton.leaf(
         child: Container(
           height: height,
@@ -776,7 +770,10 @@ class _ReaderScrollIndicator extends StatelessWidget {
           }
           final clampedThumb = thumbExtentRatio.clamp(0.05, 1.0);
           final thumbHeight = trackHeight * clampedThumb;
-          final travel = (trackHeight - thumbHeight).clamp(0.0, double.infinity);
+          final travel = (trackHeight - thumbHeight).clamp(
+            0.0,
+            double.infinity,
+          );
           final offset = travel * progress.clamp(0.0, 1.0);
           return Align(
             alignment: Alignment.centerRight,

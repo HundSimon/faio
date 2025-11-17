@@ -11,6 +11,7 @@ import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
+import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../providers/feed_providers.dart';
 import 'illustration_hero.dart';
@@ -77,9 +78,7 @@ class _IllustrationDetailScreenState
           .read(feedSelectionProvider.notifier)
           .select(widget.source, _currentIndex);
       ref
-          .read(
-            illustrationFeedControllerProvider(widget.source).notifier,
-          )
+          .read(illustrationFeedControllerProvider(widget.source).notifier)
           .ensureIndexLoaded(_currentIndex);
     });
   }
@@ -128,9 +127,9 @@ class _IllustrationDetailScreenState
   Future<void> _openSourceLink(BuildContext context, Uri url) async {
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('无法打开链接：${url.host}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('无法打开链接：${url.host}')));
     }
   }
 
@@ -143,8 +142,9 @@ class _IllustrationDetailScreenState
 
   @override
   Widget build(BuildContext context) {
-    final feedState =
-        ref.watch(illustrationFeedControllerProvider(widget.source));
+    final feedState = ref.watch(
+      illustrationFeedControllerProvider(widget.source),
+    );
 
     ref.listen<FeedSelectionState>(feedSelectionProvider, (prev, next) {
       if (!mounted) return;
@@ -224,8 +224,9 @@ class _IllustrationDetailScreenState
                   if (!mounted) return;
                   ref
                       .read(
-                        illustrationFeedControllerProvider(widget.source)
-                            .notifier,
+                        illustrationFeedControllerProvider(
+                          widget.source,
+                        ).notifier,
                       )
                       .ensureIndexLoaded(index);
                 });
@@ -293,8 +294,10 @@ class _IllustrationDetailView extends StatelessWidget {
     final theme = Theme.of(context);
     final aspectRatio = (content.previewAspectRatio ?? 1).clamp(0.4, 1.8);
     final hasSummary = content.summary.trim().isNotEmpty;
-    final heroPreview = content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
-    final heroHighRes = content.sampleUrl ?? content.originalUrl ?? content.previewUrl;
+    final heroPreview =
+        content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
+    final heroHighRes =
+        content.sampleUrl ?? content.originalUrl ?? content.previewUrl;
 
     Widget placeholder(IconData icon) {
       return Container(
@@ -319,9 +322,12 @@ class _IllustrationDetailView extends StatelessWidget {
         openColor: Colors.black,
         transitionDuration: const Duration(milliseconds: 420),
         transitionType: ContainerTransitionType.fadeThrough,
-        closedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        closedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
         tappable: false,
-        openBuilder: (context, _) => _IllustrationFullscreenView(content: content),
+        openBuilder: (context, _) =>
+            _IllustrationFullscreenView(content: content),
         closedBuilder: (context, openContainer) {
           return InkWell(
             onTap: openContainer,
@@ -390,10 +396,7 @@ class _IllustrationDetailView extends StatelessWidget {
     Widget buildMetaCard() {
       final chips = <Widget>[
         if (content.rating.isNotEmpty)
-          _MetaChip(
-            icon: Icons.shield,
-            label: '评级 ${content.rating}',
-          ),
+          _MetaChip(icon: Icons.shield, label: '评级 ${content.rating}'),
         _MetaChip(
           icon: Icons.schedule,
           label: '发布 ${_formatDateTime(content.publishedAt)}',
@@ -411,11 +414,7 @@ class _IllustrationDetailView extends StatelessWidget {
       ];
       return DetailSectionCard(
         title: '作品信息',
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: chips,
-        ),
+        child: Wrap(spacing: 8, runSpacing: 8, children: chips),
       );
     }
 
@@ -435,14 +434,7 @@ class _IllustrationDetailView extends StatelessWidget {
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: content.tags
-              .map(
-                (tag) => Chip(
-                  label: Text(tag),
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                ),
-              )
-              .toList(),
+          children: content.tags.map((tag) => TagChip(tag: tag)).toList(),
         ),
       );
     }
@@ -473,8 +465,7 @@ class _IllustrationDetailView extends StatelessWidget {
                 trailing: const Icon(Icons.open_in_new),
                 onTap: () => onOpenSource(content.sourceLinks[i]),
               ),
-              if (i < content.sourceLinks.length - 1)
-                const Divider(height: 12),
+              if (i < content.sourceLinks.length - 1) const Divider(height: 12),
             ],
           ],
         ),
@@ -494,9 +485,7 @@ class _IllustrationDetailView extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          content.authorName?.isNotEmpty == true
-              ? content.authorName!
-              : '匿名作者',
+          content.authorName?.isNotEmpty == true ? content.authorName! : '匿名作者',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -552,7 +541,9 @@ class _ProgressiveIllustrationImageState
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = Theme.of(context).colorScheme.surfaceContainerHighest;
+    final backgroundColor = Theme.of(
+      context,
+    ).colorScheme.surfaceContainerHighest;
     final layers = <Widget>[
       Positioned.fill(
         child: widget.lowRes != null
@@ -601,10 +592,7 @@ class _ProgressiveIllustrationImageState
       );
     }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: layers,
-    );
+    return Stack(fit: StackFit.expand, children: layers);
   }
 }
 
@@ -615,8 +603,10 @@ class _IllustrationFullscreenView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final preview = content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
-    final highRes = content.originalUrl ?? content.sampleUrl ?? content.previewUrl;
+    final preview =
+        content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
+    final highRes =
+        content.originalUrl ?? content.sampleUrl ?? content.previewUrl;
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -654,16 +644,16 @@ class _IllustrationFullscreenView extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   '${content.authorName?.isNotEmpty == true ? content.authorName! : '匿名作者'} · ${content.rating.isNotEmpty ? content.rating : '未知评级'}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white70,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                 ),
               ],
             ),

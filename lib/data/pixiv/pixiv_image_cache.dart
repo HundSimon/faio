@@ -36,10 +36,7 @@ class PixivImageCacheManager extends CacheManager {
           timeout: Duration(seconds: 20),
         ),
         dnsSettings: DnsSettings.dynamic(resolver: resolver.resolve),
-        tlsSettings: const TlsSettings(
-          verifyCertificates: false,
-          sni: false,
-        ),
+        tlsSettings: const TlsSettings(verifyCertificates: false, sni: false),
         throwOnStatusCode: false,
       ),
     );
@@ -61,8 +58,10 @@ class PixivRhttpFileService extends FileService {
   final RhttpClient _client;
 
   @override
-  Future<FileServiceResponse> get(String url,
-      {Map<String, String>? headers}) async {
+  Future<FileServiceResponse> get(
+    String url, {
+    Map<String, String>? headers,
+  }) async {
     final response = await _client.requestStream(
       method: HttpMethod.get,
       url: url,
@@ -75,8 +74,7 @@ class PixivRhttpFileService extends FileService {
 }
 
 class _PixivRhttpFileServiceResponse implements FileServiceResponse {
-  _PixivRhttpFileServiceResponse(this._response)
-    : _receivedAt = DateTime.now();
+  _PixivRhttpFileServiceResponse(this._response) : _receivedAt = DateTime.now();
 
   final HttpStreamResponse _response;
   final DateTime _receivedAt;

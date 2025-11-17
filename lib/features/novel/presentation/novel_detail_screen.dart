@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
+import 'package:faio/domain/models/content_tag.dart';
 import 'package:faio/domain/models/novel_detail.dart';
 import 'package:faio/domain/models/novel_reader.dart';
 import 'package:faio/domain/utils/content_id.dart';
@@ -21,6 +22,7 @@ import 'package:faio/features/library/providers/library_providers.dart';
 import 'package:faio/features/library/utils/library_mappers.dart';
 import 'package:faio/features/library/presentation/widgets/favorite_icon_button.dart';
 import 'package:faio/features/novel/presentation/novel_hero.dart';
+import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../providers/novel_providers.dart';
 import 'widgets/novel_series_sheet.dart';
@@ -479,7 +481,7 @@ class _NovelDetailContent extends ConsumerWidget {
         : (initialContent?.summary ?? detail.body);
     final tags = detail.tags.isNotEmpty
         ? detail.tags
-        : (initialContent?.tags ?? const []);
+        : (initialContent?.tags ?? const <ContentTag>[]);
     final publishedAt = detail.createdAt ?? initialContent?.publishedAt;
     final favoriteEntry =
         favoriteContent ??
@@ -658,14 +660,7 @@ class _NovelDetailContent extends ConsumerWidget {
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: tags
-              .map(
-                (tag) => Chip(
-                  label: Text(tag),
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                ),
-              )
-              .toList(),
+          children: tags.map((tag) => TagChip(tag: tag)).toList(),
         ),
       );
     }

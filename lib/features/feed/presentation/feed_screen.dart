@@ -10,6 +10,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
+import 'package:faio/domain/models/content_tag.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
@@ -18,6 +19,7 @@ import 'package:faio/features/novel/presentation/novel_detail_screen.dart'
 import 'package:faio/features/novel/presentation/novel_hero.dart';
 import 'package:faio/features/novel/providers/novel_providers.dart'
     show NovelFeedSelectionState, novelFeedSelectionProvider;
+import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../providers/feed_providers.dart';
 import 'illustration_hero.dart';
@@ -87,7 +89,7 @@ class _ResilientNetworkImageState extends State<_ResilientNetworkImage> {
   }
 }
 
-Future<void> _showAllTags(BuildContext context, List<String> tags) async {
+Future<void> _showAllTags(BuildContext context, List<ContentTag> tags) async {
   if (tags.isEmpty) {
     return;
   }
@@ -114,12 +116,7 @@ Future<void> _showAllTags(BuildContext context, List<String> tags) async {
                 spacing: 8,
                 runSpacing: 8,
                 children: tags
-                    .map(
-                      (tag) => Chip(
-                        label: Text(tag),
-                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                      ),
-                    )
+                    .map((tag) => TagChip(tag: tag, compact: true))
                     .toList(),
               ),
               const SizedBox(height: 16),
@@ -1057,19 +1054,20 @@ class _NovelListItem extends ConsumerWidget {
       ),
       theme.colorScheme.surface,
     );
-    bool isAdultTag(String tag) {
-      final lowered = tag.toLowerCase();
-      return lowered.contains('r-18') ||
-          lowered.contains('r18') ||
-          lowered.contains('18禁');
+    bool isAdultTag(ContentTag tag) {
+      final canonical = tag.canonicalName;
+      final displayLower = tag.displayName.toLowerCase();
+      return canonical.contains('r18') ||
+          canonical.contains('r_18') ||
+          displayLower.contains('18禁');
     }
 
     final uniqueTags = <String>{};
-    final adultTags = <String>[];
-    final standardTags = <String>[];
-    for (final rawTag in item.tags) {
-      final tag = rawTag.trim();
-      if (tag.isEmpty || !uniqueTags.add(tag)) {
+    final adultTags = <ContentTag>[];
+    final standardTags = <ContentTag>[];
+    for (final tag in item.tags) {
+      final canonical = tag.canonicalName;
+      if (canonical.isEmpty || !uniqueTags.add(canonical)) {
         continue;
       }
       if (isAdultTag(tag)) {
@@ -1083,14 +1081,17 @@ class _NovelListItem extends ConsumerWidget {
     final isAdultRated = ratingLower == 'adult';
     final highlightAdult = isAdultRated || adultTags.isNotEmpty;
     final adultBadgeLabel = adultTags.isNotEmpty
-        ? adultTags.first
+        ? adultTags.first.displayName
         : (isAdultRated ? 'R-18' : null);
 
     const maxInlineTags = 4;
     final visibleTags = standardTags.take(maxInlineTags).toList();
     final overflowCount = math.max(0, standardTags.length - visibleTags.length);
-    final allTagsForSheet = <String>[
-      if (adultTags.isNotEmpty) ...adultTags else if (isAdultRated) 'R-18',
+    final allTagsForSheet = <ContentTag>[
+      if (adultTags.isNotEmpty)
+        ...adultTags
+      else if (isAdultRated)
+        ContentTag.fromLabels(primary: 'R-18'),
       ...standardTags,
     ];
 
@@ -1176,14 +1177,7 @@ class _NovelListItem extends ConsumerWidget {
               );
               final imageHeight = coverWidth / constrainedAspectRatio;
 
-              Widget buildTagChip(
-                String label, {
-                bool isOverflow = false,
-                VoidCallback? onTap,
-              }) {
-                final foreground = isOverflow
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant;
+              Widget buildOverflowChip(String label, {VoidCallback? onTap}) {
                 final borderRadius = BorderRadius.circular(999);
                 final chip = Container(
                   padding: const EdgeInsets.symmetric(
@@ -1192,33 +1186,26 @@ class _NovelListItem extends ConsumerWidget {
                   ),
                   decoration: BoxDecoration(
                     borderRadius: borderRadius,
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withOpacity(
-                        theme.brightness == Brightness.dark ? 0.5 : 0.25,
-                      ),
-                    ),
-                    color: isOverflow
-                        ? theme.colorScheme.primary.withOpacity(0.12)
-                        : Colors.transparent,
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
                   ),
                   child: Text(
                     label,
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: foreground,
-                      fontWeight: isOverflow ? FontWeight.w600 : null,
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 );
-                final wrappedChip = onTap != null
-                    ? InkWell(
-                        onTap: onTap,
-                        borderRadius: borderRadius,
-                        child: chip,
-                      )
-                    : chip;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: wrappedChip,
+                  child: onTap != null
+                      ? InkWell(
+                          onTap: onTap,
+                          borderRadius: borderRadius,
+                          child: chip,
+                        )
+                      : chip,
                 );
               }
 
@@ -1268,11 +1255,14 @@ class _NovelListItem extends ConsumerWidget {
                 }
 
                 final tagWidgets = <Widget>[
-                  for (final tag in visibleTags) buildTagChip(tag),
+                  for (final tag in visibleTags)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: TagChip(tag: tag, compact: true),
+                    ),
                   if (overflowCount > 0)
-                    buildTagChip(
+                    buildOverflowChip(
                       '+$overflowCount',
-                      isOverflow: true,
                       onTap: () => _showAllTags(context, allTagsForSheet),
                     ),
                 ];

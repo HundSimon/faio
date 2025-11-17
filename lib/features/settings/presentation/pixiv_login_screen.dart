@@ -94,7 +94,9 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
         });
         return NavigationDecision.prevent;
       }
-      debugPrint('Pixiv WebView intercepted callback (code length=${code.length})');
+      debugPrint(
+        'Pixiv WebView intercepted callback (code length=${code.length})',
+      );
       _handledAuthorization = true;
       _exchangeCode(code);
       return NavigationDecision.prevent;
@@ -109,8 +111,9 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
     }
     failingUrl ??= error.url;
 
-    final parsedFailingUri =
-        failingUrl != null ? Uri.tryParse(failingUrl) : null;
+    final parsedFailingUri = failingUrl != null
+        ? Uri.tryParse(failingUrl)
+        : null;
     if (parsedFailingUri != null && _isTrackingDomain(parsedFailingUri)) {
       debugPrint(
         'Ignoring tracking resource error (${error.errorCode}) for $failingUrl',
@@ -170,14 +173,17 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
       );
       await _controller.setUserAgent(session.userAgent);
       debugPrint('Pixiv WebView loading URL: ${session.loginUri}');
-      await _controller.loadRequest(session.loginUri, headers: {
-        'User-Agent': session.userAgent,
-        'Referer': 'https://app-api.pixiv.net/',
-        'X-Requested-With': 'com.pixiv.android',
-        'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN',
-      });
+      await _controller.loadRequest(
+        session.loginUri,
+        headers: {
+          'User-Agent': session.userAgent,
+          'Referer': 'https://app-api.pixiv.net/',
+          'X-Requested-With': 'com.pixiv.android',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'zh-CN',
+        },
+      );
       if (!mounted) return;
       setState(() {
         _isInitializing = false;

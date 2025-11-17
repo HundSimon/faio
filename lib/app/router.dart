@@ -65,9 +65,12 @@ final appRouterProvider = Provider<GoRouter>(
                       } else {
                         final indexParam = state.uri.queryParameters['index'];
                         final sourceParam = state.uri.queryParameters['source'];
-                        final index =
-                            indexParam != null ? int.tryParse(indexParam) : null;
-                        final source = _illustrationSourceFromParam(sourceParam);
+                        final index = indexParam != null
+                            ? int.tryParse(indexParam)
+                            : null;
+                        final source = _illustrationSourceFromParam(
+                          sourceParam,
+                        );
                         if (index != null && source != null) {
                           args = IllustrationDetailRouteArgs(
                             source: source,

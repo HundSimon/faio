@@ -19,12 +19,12 @@ class AppNetworkConfig extends Equatable {
 
   @override
   List<Object?> get props => [
-        userAgent,
-        connectTimeout,
-        receiveTimeout,
-        sendTimeout,
-        logNetworking,
-      ];
+    userAgent,
+    connectTimeout,
+    receiveTimeout,
+    sendTimeout,
+    logNetworking,
+  ];
 
   AppNetworkConfig copyWith({
     String? userAgent,

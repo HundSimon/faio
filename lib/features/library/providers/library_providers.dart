@@ -12,12 +12,11 @@ final libraryStorageProvider = Provider<LibraryStorage>((ref) {
   return LibraryStorage(prefsFuture: prefsFuture);
 }, name: 'libraryStorageProvider');
 
-final libraryFavoritesProvider = AsyncNotifierProvider<
-    LibraryFavoritesController,
-    List<LibraryFavoriteEntry>>(
-  LibraryFavoritesController.new,
-  name: 'libraryFavoritesProvider',
-);
+final libraryFavoritesProvider =
+    AsyncNotifierProvider<
+      LibraryFavoritesController,
+      List<LibraryFavoriteEntry>
+    >(LibraryFavoritesController.new, name: 'libraryFavoritesProvider');
 
 class LibraryFavoritesController
     extends AsyncNotifier<List<LibraryFavoriteEntry>> {
@@ -52,8 +51,9 @@ class LibraryFavoritesController
         content: content,
         savedAt: DateTime.now(),
       );
-      final filtered =
-          current.where((existing) => existing.key != entry.key).toList();
+      final filtered = current
+          .where((existing) => existing.key != entry.key)
+          .toList();
       next = [entry, ...filtered];
     }
     state = AsyncValue.data(next);
@@ -73,8 +73,9 @@ class LibraryFavoritesController
         series: series,
         savedAt: DateTime.now(),
       );
-      final filtered =
-          current.where((existing) => existing.key != entry.key).toList();
+      final filtered = current
+          .where((existing) => existing.key != entry.key)
+          .toList();
       next = [entry, ...filtered];
     }
     state = AsyncValue.data(next);
@@ -102,12 +103,11 @@ class LibraryFavoritesController
   }
 }
 
-final libraryHistoryProvider = AsyncNotifierProvider<
-    LibraryHistoryController,
-    List<LibraryHistoryEntry>>(
-  LibraryHistoryController.new,
-  name: 'libraryHistoryProvider',
-);
+final libraryHistoryProvider =
+    AsyncNotifierProvider<LibraryHistoryController, List<LibraryHistoryEntry>>(
+      LibraryHistoryController.new,
+      name: 'libraryHistoryProvider',
+    );
 
 class LibraryHistoryController
     extends AsyncNotifier<List<LibraryHistoryEntry>> {
@@ -131,8 +131,9 @@ class LibraryHistoryController
 
   Future<void> recordView(FaioContent content) async {
     final current = await _current();
-    final filtered =
-        current.where((entry) => entry.content.id != content.id).toList();
+    final filtered = current
+        .where((entry) => entry.content.id != content.id)
+        .toList();
     final entry = LibraryHistoryEntry(
       content: content,
       viewedAt: DateTime.now(),

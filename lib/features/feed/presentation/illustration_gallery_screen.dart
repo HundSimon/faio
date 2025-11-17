@@ -41,9 +41,7 @@ class _IllustrationGalleryScreenState
           .read(feedSelectionProvider.notifier)
           .select(widget.source, _currentIndex);
       ref
-          .read(
-            illustrationFeedControllerProvider(widget.source).notifier,
-          )
+          .read(illustrationFeedControllerProvider(widget.source).notifier)
           .ensureIndexLoaded(_currentIndex);
     });
   }
@@ -69,8 +67,9 @@ class _IllustrationGalleryScreenState
 
   @override
   Widget build(BuildContext context) {
-    final feedState =
-        ref.watch(illustrationFeedControllerProvider(widget.source));
+    final feedState = ref.watch(
+      illustrationFeedControllerProvider(widget.source),
+    );
     final items = feedState.items;
     final itemCount = feedState.hasMore ? items.length + 1 : items.length;
 
@@ -92,8 +91,9 @@ class _IllustrationGalleryScreenState
                   if (feedState.hasMore && !feedState.isLoadingMore) {
                     ref
                         .read(
-                          illustrationFeedControllerProvider(widget.source)
-                              .notifier,
+                          illustrationFeedControllerProvider(
+                            widget.source,
+                          ).notifier,
                         )
                         .ensureIndexLoaded(index);
                   }

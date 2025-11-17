@@ -49,15 +49,19 @@ class NovelReaderSettings extends Equatable {
       fontFamily: json['fontFamily'] as String? ?? 'sans',
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 18.0,
       lineHeight: (json['lineHeight'] as num?)?.toDouble() ?? 1.6,
-      paragraphSpacing:
-          (json['paragraphSpacing'] as num?)?.toDouble() ?? 12.0,
+      paragraphSpacing: (json['paragraphSpacing'] as num?)?.toDouble() ?? 12.0,
       themeId: json['themeId'] as String? ?? 'light',
     );
   }
 
   @override
-  List<Object?> get props =>
-      [fontFamily, fontSize, lineHeight, paragraphSpacing, themeId];
+  List<Object?> get props => [
+    fontFamily,
+    fontSize,
+    lineHeight,
+    paragraphSpacing,
+    themeId,
+  ];
 }
 
 class NovelReadingProgress extends Equatable {
@@ -102,7 +106,8 @@ class NovelReadingProgress extends Equatable {
       );
     }
     final updatedAtRaw = json['updatedAt'] as String? ?? '';
-    final updatedAt = DateTime.tryParse(updatedAtRaw) ??
+    final updatedAt =
+        DateTime.tryParse(updatedAtRaw) ??
         DateTime.fromMillisecondsSinceEpoch(0);
     return NovelReadingProgress(
       novelId: novelId,
@@ -116,13 +121,13 @@ class NovelReadingProgress extends Equatable {
 
   @override
   List<Object?> get props => [
-        novelId,
-        relativeOffset,
-        updatedAt,
-        absoluteOffset,
-        viewportExtent,
-        contentExtent,
-      ];
+    novelId,
+    relativeOffset,
+    updatedAt,
+    absoluteOffset,
+    viewportExtent,
+    contentExtent,
+  ];
 
   NovelReadingProgress copyWith({
     double? relativeOffset,

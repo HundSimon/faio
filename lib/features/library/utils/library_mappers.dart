@@ -1,11 +1,9 @@
 import '../../../domain/models/content_item.dart';
+import '../../../domain/models/content_tag.dart';
 import '../../../domain/models/novel_detail.dart';
 import '../../../domain/utils/content_id.dart';
 
-FaioContent novelDetailToContent(
-  NovelDetail detail, {
-  FaioContent? fallback,
-}) {
+FaioContent novelDetailToContent(NovelDetail detail, {FaioContent? fallback}) {
   final fallbackSummary = detail.fallbackSummary.trim();
   final summary = fallbackSummary.isNotEmpty
       ? fallbackSummary
@@ -28,7 +26,9 @@ FaioContent novelDetailToContent(
     updatedAt: detail.updatedAt ?? fallback?.updatedAt,
     rating: fallback?.rating ?? 'General',
     authorName: detail.authorName ?? fallback?.authorName,
-    tags: detail.tags.isNotEmpty ? detail.tags : (fallback?.tags ?? const []),
+    tags: detail.tags.isNotEmpty
+        ? detail.tags
+        : (fallback?.tags ?? const <ContentTag>[]),
     favoriteCount: detail.likeCount ?? fallback?.favoriteCount ?? 0,
     sourceLinks: detail.sourceLinks.isNotEmpty
         ? detail.sourceLinks
@@ -36,10 +36,7 @@ FaioContent novelDetailToContent(
   );
 }
 
-NovelDetail contentToNovelDetail(
-  FaioContent content, {
-  int? novelIdOverride,
-}) {
+NovelDetail contentToNovelDetail(FaioContent content, {int? novelIdOverride}) {
   final numericId = novelIdOverride ?? parseContentNumericId(content) ?? 0;
   final coverUrl = content.sampleUrl ?? content.previewUrl;
   return NovelDetail(

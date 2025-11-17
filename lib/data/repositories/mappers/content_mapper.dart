@@ -1,4 +1,6 @@
 import '../../../domain/models/content_item.dart';
+import '../../../domain/models/content_tag.dart';
+import '../../../domain/utils/content_tag_builder.dart';
 import '../../e621/models/e621_post.dart';
 import '../../furrynovel/models/furry_novel_models.dart';
 import '../../pixiv/models/pixiv_models.dart';
@@ -34,7 +36,7 @@ class ContentMapper {
       updatedAt: post.updatedAt,
       rating: post.rating.toNormalizedRating(),
       authorName: null,
-      tags: post.tags,
+      tags: _buildStringTags(post.tags),
       favoriteCount: post.favCount,
       sourceLinks: post.sources,
     );
@@ -86,7 +88,7 @@ class ContentMapper {
 
     final aspectRatio = _pixivAspectRatio(illust);
     final rating = _pixivRating(illust.xRestrict, illust.sanityLevel);
-    final tags = _pixivTagNames(illust.tags);
+    final tags = _pixivTags(illust.tags);
     final summary = illust.caption.trim();
     final type = switch (illust.type) {
       PixivIllustType.manga => ContentType.comic,
@@ -120,7 +122,7 @@ class ContentMapper {
         novel.coverImageUrls.squareMedium;
 
     final summary = novel.caption.trim();
-    final tags = _pixivTagNames(novel.tags);
+    final tags = _pixivTags(novel.tags);
 
     return FaioContent(
       id: 'pixiv_novel:${novel.id}',
@@ -159,7 +161,7 @@ class ContentMapper {
         : null;
     final publishedAt =
         novel.createDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final tags = novel.tags;
+    final tags = _buildStringTags(novel.tags);
     final rating = _furryNovelRating(tags);
 
     final links = <Uri>[
@@ -222,26 +224,38 @@ class ContentMapper {
     return 'General';
   }
 
-  static List<String> _pixivTagNames(List<PixivTag> tags) {
-    final names = <String>{};
+  static List<ContentTag> _pixivTags(List<PixivTag> tags) {
+    final builder = ContentTagBuilder();
     for (final tag in tags) {
-      if (tag.name.isNotEmpty) {
-        names.add(tag.name);
+      final primary = tag.name.trim();
+      if (primary.isEmpty) {
+        continue;
       }
-      final translated = tag.translatedName;
-      if (translated != null && translated.isNotEmpty) {
-        names.add(translated);
-      }
+      final translated = tag.translatedName?.trim();
+      builder.addLabel(
+        primary,
+        display: translated?.isNotEmpty == true ? translated : primary,
+        aliases: [if (translated != null && translated.isNotEmpty) translated],
+      );
     }
-    return names.toList();
+    return builder.build();
   }
 
-  static String _furryNovelRating(List<String> tags) {
-    final lowered = tags.map((tag) => tag.toLowerCase()).toList();
-    if (lowered.any((tag) => tag.contains('r-18') || tag.contains('r18'))) {
+  static List<ContentTag> _buildStringTags(List<String> tags) {
+    final builder = ContentTagBuilder();
+    for (final tag in tags) {
+      if (tag.trim().isEmpty) continue;
+      builder.addLabel(tag);
+    }
+    return builder.build();
+  }
+
+  static String _furryNovelRating(List<ContentTag> tags) {
+    final lowered = tags.map((tag) => tag.canonicalName).toList();
+    if (lowered.any((tag) => tag.contains('r18') || tag.contains('r_18'))) {
       return 'Adult';
     }
-    if (lowered.any((tag) => tag.contains('r-15') || tag.contains('r15'))) {
+    if (lowered.any((tag) => tag.contains('r15') || tag.contains('r_15'))) {
       return 'Mature';
     }
     return 'General';

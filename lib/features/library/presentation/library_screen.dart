@@ -8,6 +8,7 @@ import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
+import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../../novel/presentation/widgets/novel_series_sheet.dart';
 import '../domain/library_entries.dart';
@@ -32,9 +33,7 @@ class LibraryScreen extends ConsumerWidget {
     final hasHistory = historyAsync.valueOrNull?.isNotEmpty ?? false;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('库'),
-      ),
+      appBar: AppBar(title: const Text('库')),
       body: RefreshIndicator(
         onRefresh: refresh,
         child: ListView(
@@ -56,7 +55,9 @@ class LibraryScreen extends ConsumerWidget {
               trailing: hasHistory
                   ? TextButton(
                       onPressed: () {
-                        ref.read(libraryHistoryProvider.notifier).clearHistory();
+                        ref
+                            .read(libraryHistoryProvider.notifier)
+                            .clearHistory();
                       },
                       child: const Text('清除'),
                     )
@@ -120,9 +121,9 @@ class _FavoritesSection extends StatelessWidget {
       children.add(
         Text(
           '小说合集',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
       );
       children.add(const SizedBox(height: 8));
@@ -197,7 +198,9 @@ class _LibraryContentTile extends StatelessWidget {
     final meta = metaParts.where((part) => part.trim().isNotEmpty).join(' · ');
     final summary = content.summary.trim().isNotEmpty
         ? content.summary.trim()
-        : (content.tags.isNotEmpty ? content.tags.join(', ') : '暂无简介');
+        : (content.tags.isNotEmpty
+              ? content.tags.map((tag) => tag.displayName).join(', ')
+              : '暂无简介');
 
     return Material(
       color: theme.colorScheme.surfaceContainerHighest.withOpacity(
@@ -391,12 +394,7 @@ class _SectionError extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 120,
-      child: Center(
-        child: Text(
-          '加载失败：$message',
-          textAlign: TextAlign.center,
-        ),
-      ),
+      child: Center(child: Text('加载失败：$message', textAlign: TextAlign.center)),
     );
   }
 }
@@ -539,16 +537,14 @@ class _LibraryContentPreview extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: AspectRatio(
-                  aspectRatio:
-                      (content.previewAspectRatio ?? 1).clamp(0.5, 1.6).toDouble(),
+                  aspectRatio: (content.previewAspectRatio ?? 1)
+                      .clamp(0.5, 1.6)
+                      .toDouble(),
                   child: _PreviewImage(content: content, url: preview),
                 ),
               ),
             const SizedBox(height: 12),
-            Text(
-              summary,
-              style: theme.textTheme.bodyLarge,
-            ),
+            Text(summary, style: theme.textTheme.bodyLarge),
             const SizedBox(height: 12),
             Text(
               '来源：${content.source}',
@@ -572,12 +568,7 @@ class _LibraryContentPreview extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: tags
-                    .map(
-                      (tag) => Chip(
-                        label: Text(tag),
-                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                      ),
-                    )
+                    .map((tag) => TagChip(tag: tag, compact: true))
                     .toList(),
               ),
             if (content.sourceLinks.isNotEmpty ||
@@ -586,8 +577,8 @@ class _LibraryContentPreview extends StatelessWidget {
               FilledButton.icon(
                 icon: const Icon(Icons.open_in_new),
                 onPressed: () {
-                  final target = content.originalUrl ??
-                      content.sourceLinks.firstOrNull;
+                  final target =
+                      content.originalUrl ?? content.sourceLinks.firstOrNull;
                   if (target != null) {
                     _launchExternal(context, target);
                   }
@@ -655,9 +646,9 @@ Future<void> _openContent(BuildContext context, FaioContent content) async {
   if (content.type == ContentType.novel) {
     final novelId = parseContentNumericId(content);
     if (novelId == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('无法解析小说 ID')),
-      );
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('无法解析小说 ID')));
       return;
     }
     context.push('/feed/novel/$novelId', extra: content);
@@ -688,9 +679,9 @@ Future<void> _openSeries(
 
 Future<void> _launchExternal(BuildContext context, Uri url) async {
   if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text('无法打开链接：${url.toString()}')),
-    );
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text('无法打开链接：${url.toString()}')));
   }
 }
 

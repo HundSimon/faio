@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/content_item.dart';
 import '../../domain/repositories/content_repository.dart';
 import '../../domain/repositories/pixiv_repository.dart';
+import '../../domain/services/tag_filter.dart';
 import '../e621/e621_auth.dart';
 import '../e621/e621_credentials.dart';
 import '../e621/e621_providers.dart';
@@ -13,16 +14,20 @@ import '../pixiv/pixiv_auth.dart';
 import '../pixiv/pixiv_credentials.dart';
 import '../pixiv/pixiv_providers.dart';
 import 'mappers/content_mapper.dart';
+import '../../core/tagging/tag_preferences_provider.dart';
 
 class ContentRepositoryImpl implements ContentRepository {
   ContentRepositoryImpl({
     required E621Service e621Service,
     required PixivRepository pixivRepository,
+    required TagFilter Function() tagFilterResolver,
   }) : _e621Service = e621Service,
-       _pixivRepository = pixivRepository;
+       _pixivRepository = pixivRepository,
+       _tagFilterResolver = tagFilterResolver;
 
   final E621Service _e621Service;
   final PixivRepository _pixivRepository;
+  final TagFilter Function() _tagFilterResolver;
 
   final StreamController<List<FaioContent>> _controller =
       StreamController<List<FaioContent>>.broadcast();
@@ -113,14 +118,16 @@ class ContentRepositoryImpl implements ContentRepository {
       }
     }
 
-    if (deduped.isEmpty && sourceErrors.isNotEmpty) {
+    final filtered = _filterItems(deduped);
+
+    if (filtered.isEmpty && sourceErrors.isNotEmpty) {
       Error.throwWithStackTrace(sourceErrors.first, sourceStacks.first);
     }
 
-    if (deduped.length > limit) {
-      return deduped.sublist(0, limit);
+    if (filtered.length > limit) {
+      return filtered.sublist(0, limit);
     }
-    return deduped;
+    return filtered;
   }
 
   @override
@@ -140,8 +147,9 @@ class ContentRepositoryImpl implements ContentRepository {
           .map(ContentMapper.fromE621)
           .whereType<FaioContent>()
           .toList();
-      items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-      return items;
+      final filtered = _filterItems(items);
+      filtered.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+      return filtered;
     }
 
     final posts = await _e621Service.searchPosts(query: query);
@@ -149,8 +157,9 @@ class ContentRepositoryImpl implements ContentRepository {
         .map(ContentMapper.fromE621)
         .whereType<FaioContent>()
         .toList();
-    items.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
-    return items;
+    final filtered = _filterItems(items);
+    filtered.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    return filtered;
   }
 
   void dispose() {
@@ -169,11 +178,12 @@ class ContentRepositoryImpl implements ContentRepository {
       tags: tags,
     );
 
-    return posts
+    final items = posts
         .map(ContentMapper.fromE621)
         .whereType<FaioContent>()
         .where((item) => item.type == ContentType.illustration)
         .toList();
+    return _filterItems(items);
   }
 
   Future<List<FaioContent>> _fetchPixiv({
@@ -188,20 +198,35 @@ class ContentRepositoryImpl implements ContentRepository {
         .where((item) => item.type == ContentType.illustration)
         .toList();
   }
+
+  List<FaioContent> _filterItems(List<FaioContent> items) {
+    final filter = _tagFilterResolver();
+    if (filter.isInactive) {
+      return items;
+    }
+    return items.where(filter.allows).toList();
+  }
 }
 
 final contentRepositoryProvider = Provider<ContentRepository>((ref) {
   final e621Service = ref.watch(e621ServiceProvider);
   final pixivRepository = ref.watch(pixivRepositoryProvider);
+  final tagFilterResolver = () => ref.read(tagFilterProvider);
   final repository = ContentRepositoryImpl(
     e621Service: e621Service,
     pixivRepository: pixivRepository,
+    tagFilterResolver: tagFilterResolver,
   );
   ref.listen<E621Credentials?>(e621AuthProvider, (previous, next) {
     unawaited(repository.refreshFeed());
   });
   ref.listen<PixivCredentials?>(pixivAuthProvider, (previous, next) {
     unawaited(repository.refreshFeed());
+  });
+  ref.listen(tagPreferencesProvider, (previous, next) {
+    if (previous?.valueOrNull != next.valueOrNull) {
+      unawaited(repository.refreshFeed());
+    }
   });
   ref.onDispose(repository.dispose);
   return repository;

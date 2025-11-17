@@ -6,7 +6,7 @@ import '../../../domain/models/novel_reader.dart';
 
 class NovelReadingStorage {
   NovelReadingStorage({Future<SharedPreferences>? prefsFuture})
-      : _prefsFuture = prefsFuture ?? SharedPreferences.getInstance();
+    : _prefsFuture = prefsFuture ?? SharedPreferences.getInstance();
 
   final Future<SharedPreferences> _prefsFuture;
 
@@ -29,10 +29,7 @@ class NovelReadingStorage {
 
   Future<void> saveSettings(NovelReaderSettings settings) async {
     final prefs = await _prefsFuture;
-    await prefs.setString(
-      _settingsKey,
-      jsonEncode(settings.toJson()),
-    );
+    await prefs.setString(_settingsKey, jsonEncode(settings.toJson()));
   }
 
   Future<NovelReadingProgress?> loadProgress(int novelId) async {

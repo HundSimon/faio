@@ -50,10 +50,7 @@ class PixivHttpService implements PixivService {
   }) async {
     final response = await _getJson(
       path: '/v2/illust/follow',
-      queryParameters: {
-        'restrict': 'all',
-        'offset': offset,
-      },
+      queryParameters: {'restrict': 'all', 'offset': offset},
     );
     final illusts = parsePixivIllustList(response['illusts']);
     final nextUrl = response['next_url'] as String?;

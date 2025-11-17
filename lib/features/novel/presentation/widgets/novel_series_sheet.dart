@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
+import 'package:faio/features/tagging/widgets/tag_chip.dart';
 
 import '../../../../domain/models/novel_detail.dart';
 import '../../providers/novel_providers.dart';
@@ -35,10 +36,7 @@ Future<int?> showNovelSeriesSheet({
                 error: (error, stackTrace) => SizedBox(
                   height: 240,
                   child: Center(
-                    child: Text(
-                      '系列加载失败：$error',
-                      textAlign: TextAlign.center,
-                    ),
+                    child: Text('系列加载失败：$error', textAlign: TextAlign.center),
                   ),
                 ),
               ),
@@ -59,10 +57,7 @@ class _SeriesSheetBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (detail == null) {
-      return const SizedBox(
-        height: 200,
-        child: Center(child: Text('未找到系列信息')),
-      );
+      return const SizedBox(height: 200, child: Center(child: Text('未找到系列信息')));
     }
 
     final theme = Theme.of(context);
@@ -98,13 +93,7 @@ class _SeriesSheetBody extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: detail!.tags
-                        .map(
-                          (tag) => Chip(
-                            label: Text(tag),
-                            backgroundColor:
-                                theme.colorScheme.surfaceContainerHighest,
-                          ),
-                        )
+                        .map((tag) => TagChip(tag: tag, compact: true))
                         .toList(),
                   ),
                 ],

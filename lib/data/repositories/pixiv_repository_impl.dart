@@ -2,6 +2,7 @@ import '../../domain/models/content_item.dart';
 import '../../domain/models/content_page.dart';
 import '../../domain/models/novel_detail.dart';
 import '../../domain/repositories/pixiv_repository.dart';
+import '../../domain/services/tag_filter.dart';
 import '../furrynovel/furrynovel_service.dart';
 import '../pixiv/models/pixiv_models.dart';
 import '../pixiv/pixiv_service.dart';
@@ -12,11 +13,14 @@ class PixivRepositoryImpl implements PixivRepository {
   PixivRepositoryImpl({
     required PixivService service,
     required FurryNovelService furryNovelService,
-  })  : _service = service,
-        _furryNovelService = furryNovelService;
+    required TagFilter Function() tagFilterResolver,
+  }) : _service = service,
+       _furryNovelService = furryNovelService,
+       _tagFilterResolver = tagFilterResolver;
 
   final PixivService _service;
   final FurryNovelService _furryNovelService;
+  final TagFilter Function() _tagFilterResolver;
   final Map<int, int> _novelLikeCountCache = {};
 
   @override
@@ -29,11 +33,12 @@ class PixivRepositoryImpl implements PixivRepository {
       offset: offset,
       limit: limit,
     );
-    final items = response.items
+    final rawItems = response.items
         .map(ContentMapper.fromPixivIllust)
         .whereType<FaioContent>()
         .toList();
-    final hasMore = response.hasNextPage || items.length >= limit;
+    final items = _filterItems(rawItems);
+    final hasMore = response.hasNextPage || rawItems.length >= limit;
     return ContentPageResult(
       items: items,
       page: page,
@@ -50,12 +55,13 @@ class PixivRepositoryImpl implements PixivRepository {
   }) async {
     final offset = _offsetForPage(page, limit);
     final response = await _service.fetchManga(offset: offset, limit: limit);
-    final items = response.items
+    final rawItems = response.items
         .where((illust) => illust.type == PixivIllustType.manga)
         .map(ContentMapper.fromPixivIllust)
         .whereType<FaioContent>()
         .toList();
-    final hasMore = response.hasNextPage || items.length >= limit;
+    final items = _filterItems(rawItems);
+    final hasMore = response.hasNextPage || rawItems.length >= limit;
     return ContentPageResult(
       items: items,
       page: page,
@@ -79,10 +85,11 @@ class PixivRepositoryImpl implements PixivRepository {
       _novelLikeCountCache[novel.id] = novel.pixivLikeCount;
     }
 
-    final items = result.items
+    final rawItems = result.items
         .map(ContentMapper.fromFurryNovel)
         .whereType<FaioContent>()
         .toList();
+    final items = _filterItems(rawItems);
     final hasMore = result.hasMore;
     return ContentPageResult(
       items: items,
@@ -131,5 +138,13 @@ class PixivRepositoryImpl implements PixivRepository {
   int _offsetForPage(int page, int limit) {
     final normalizedPage = page <= 0 ? 1 : page;
     return (normalizedPage - 1) * limit;
+  }
+
+  List<FaioContent> _filterItems(List<FaioContent> items) {
+    final filter = _tagFilterResolver();
+    if (filter.isInactive) {
+      return items;
+    }
+    return items.where(filter.allows).toList();
   }
 }

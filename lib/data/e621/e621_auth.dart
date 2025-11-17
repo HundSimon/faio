@@ -24,10 +24,7 @@ class E621AuthNotifier extends StateNotifier<E621Credentials?> {
     }
   }
 
-  void update({
-    required String username,
-    required String apiKey,
-  }) {
+  void update({required String username, required String apiKey}) {
     final trimmedUser = username.trim();
     final trimmedKey = apiKey.trim();
     if (trimmedUser.isEmpty || trimmedKey.isEmpty) {
@@ -35,7 +32,10 @@ class E621AuthNotifier extends StateNotifier<E621Credentials?> {
       return;
     }
 
-    final credentials = E621Credentials(username: trimmedUser, apiKey: trimmedKey);
+    final credentials = E621Credentials(
+      username: trimmedUser,
+      apiKey: trimmedKey,
+    );
     state = credentials;
     unawaited(_storage.write(credentials));
   }
@@ -54,6 +54,6 @@ final e621CredentialStorageProvider = Provider<E621CredentialStorage>((ref) {
 /// Holds the current e621 authentication credentials in memory.
 final e621AuthProvider =
     StateNotifierProvider<E621AuthNotifier, E621Credentials?>((ref) {
-  final storage = ref.watch(e621CredentialStorageProvider);
-  return E621AuthNotifier(storage);
-}, name: 'e621AuthProvider');
+      final storage = ref.watch(e621CredentialStorageProvider);
+      return E621AuthNotifier(storage);
+    }, name: 'e621AuthProvider');

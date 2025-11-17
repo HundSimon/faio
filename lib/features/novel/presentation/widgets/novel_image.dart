@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 
 class ResilientNetworkImage extends StatefulWidget {
-  const ResilientNetworkImage({super.key, 
+  const ResilientNetworkImage({
+    super.key,
     required this.urls,
     this.headers,
     this.fit = BoxFit.cover,

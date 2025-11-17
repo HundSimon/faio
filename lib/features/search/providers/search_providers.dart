@@ -5,8 +5,9 @@ import '../../../domain/models/content_item.dart';
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
-final searchResultsProvider =
-    FutureProvider.autoDispose<List<FaioContent>>((ref) async {
+final searchResultsProvider = FutureProvider.autoDispose<List<FaioContent>>((
+  ref,
+) async {
   final query = ref.watch(searchQueryProvider);
   if (query.trim().isEmpty) {
     return const [];

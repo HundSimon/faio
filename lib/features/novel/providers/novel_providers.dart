@@ -31,8 +31,7 @@ class NovelFeedSelectionState {
 
 class NovelFeedSelectionController
     extends StateNotifier<NovelFeedSelectionState> {
-  NovelFeedSelectionController()
-      : super(const NovelFeedSelectionState());
+  NovelFeedSelectionController() : super(const NovelFeedSelectionState());
 
   void select(int index) {
     state = state.copyWith(selectedIndex: index);
@@ -51,19 +50,23 @@ class NovelFeedSelectionController
   }
 }
 
-final novelFeedSelectionProvider = StateNotifierProvider.autoDispose<
-    NovelFeedSelectionController,
-    NovelFeedSelectionState>((ref) {
-  return NovelFeedSelectionController();
-}, name: 'novelFeedSelectionProvider');
+final novelFeedSelectionProvider =
+    StateNotifierProvider.autoDispose<
+      NovelFeedSelectionController,
+      NovelFeedSelectionState
+    >((ref) {
+      return NovelFeedSelectionController();
+    }, name: 'novelFeedSelectionProvider');
 
 final novelReadingStorageProvider = Provider<NovelReadingStorage>((ref) {
   final prefsFuture = ref.watch(sharedPreferencesProvider);
   return NovelReadingStorage(prefsFuture: prefsFuture);
 }, name: 'novelReadingStorageProvider');
 
-final novelDetailProvider =
-    AutoDisposeFutureProvider.family<NovelDetail, int>((ref, novelId) async {
+final novelDetailProvider = AutoDisposeFutureProvider.family<NovelDetail, int>((
+  ref,
+  novelId,
+) async {
   final repository = ref.watch(pixivRepositoryProvider);
   final detail = await repository.fetchNovelDetail(novelId);
   if (detail == null) {
@@ -73,35 +76,37 @@ final novelDetailProvider =
 }, name: 'novelDetailProvider');
 
 final novelSeriesDetailProvider =
-    AutoDisposeFutureProvider.family<NovelSeriesDetail?, int>(
-      (ref, seriesId) async {
-        final repository = ref.watch(pixivRepositoryProvider);
-        return repository.fetchNovelSeries(seriesId);
-      },
-      name: 'novelSeriesDetailProvider',
-    );
+    AutoDisposeFutureProvider.family<NovelSeriesDetail?, int>((
+      ref,
+      seriesId,
+    ) async {
+      final repository = ref.watch(pixivRepositoryProvider);
+      return repository.fetchNovelSeries(seriesId);
+    }, name: 'novelSeriesDetailProvider');
 
 final novelReadingProgressProvider =
-    AutoDisposeFutureProvider.family<NovelReadingProgress?, int>(
-      (ref, novelId) async {
-        final storage = ref.watch(novelReadingStorageProvider);
-        return storage.loadProgress(novelId);
-      },
-      name: 'novelReadingProgressProvider',
-    );
+    AutoDisposeFutureProvider.family<NovelReadingProgress?, int>((
+      ref,
+      novelId,
+    ) async {
+      final storage = ref.watch(novelReadingStorageProvider);
+      return storage.loadProgress(novelId);
+    }, name: 'novelReadingProgressProvider');
 
-final novelReaderSettingsProvider = StateNotifierProvider<
-    NovelReaderSettingsController,
-    AsyncValue<NovelReaderSettings>>((ref) {
-  final storage = ref.watch(novelReadingStorageProvider);
-  return NovelReaderSettingsController(storage: storage);
-}, name: 'novelReaderSettingsProvider');
+final novelReaderSettingsProvider =
+    StateNotifierProvider<
+      NovelReaderSettingsController,
+      AsyncValue<NovelReaderSettings>
+    >((ref) {
+      final storage = ref.watch(novelReadingStorageProvider);
+      return NovelReaderSettingsController(storage: storage);
+    }, name: 'novelReaderSettingsProvider');
 
 class NovelReaderSettingsController
     extends StateNotifier<AsyncValue<NovelReaderSettings>> {
   NovelReaderSettingsController({required NovelReadingStorage storage})
-      : _storage = storage,
-        super(const AsyncValue.loading()) {
+    : _storage = storage,
+      super(const AsyncValue.loading()) {
     _load();
   }
 

@@ -1,4 +1,6 @@
+import '../../../domain/models/content_tag.dart';
 import '../../../domain/models/novel_detail.dart';
+import '../../../domain/utils/content_tag_builder.dart';
 import '../../furrynovel/models/furry_novel_models.dart';
 import '../../pixiv/models/pixiv_models.dart';
 
@@ -10,8 +12,9 @@ class NovelMapper {
     final body = (novel.content ?? novel.description).trim();
     final description = novel.description.trim();
     final resolvedBody = body.isNotEmpty ? body : description;
-    final resolvedDescription =
-        description.isNotEmpty ? description : resolvedBody;
+    final resolvedDescription = description.isNotEmpty
+        ? description
+        : resolvedBody;
     final title = novel.title.trim().isEmpty ? 'Untitled' : novel.title.trim();
     final authorName = novel.userName?.trim();
     final outline = novel.series?.isValid ?? false ? novel.series : null;
@@ -32,6 +35,7 @@ class NovelMapper {
       Uri.parse('https://www.pixiv.net/novel/show.php?id=${novel.id}'),
     ];
 
+    final tags = _stringTags(novel.tags);
     return NovelDetail(
       novelId: novel.id,
       source: 'furrynovel',
@@ -42,7 +46,7 @@ class NovelMapper {
           ? authorName
           : null,
       authorId: novel.userId,
-      tags: novel.tags,
+      tags: tags,
       series: series,
       coverUrl: novel.coverUrl,
       length: novel.length,
@@ -63,16 +67,18 @@ class NovelMapper {
         novel.coverImageUrls.medium ??
         novel.coverImageUrls.squareMedium;
 
+    final tags = _pixivTags(novel.tags);
     return NovelDetail(
       novelId: novel.id,
       source: 'pixiv',
       title: title,
       description: summary,
       body: summary,
-      authorName:
-          novel.user.name.trim().isNotEmpty ? novel.user.name.trim() : null,
+      authorName: novel.user.name.trim().isNotEmpty
+          ? novel.user.name.trim()
+          : null,
       authorId: novel.user.id == 0 ? null : novel.user.id,
-      tags: novel.tags.map((tag) => tag.name).toList(),
+      tags: tags,
       series: null,
       coverUrl: image,
       length: novel.textLength,
@@ -91,11 +97,12 @@ class NovelMapper {
       return null;
     }
 
+    final tags = _stringTags(detail.tags);
     return NovelSeriesDetail(
       id: detail.id,
       title: detail.title,
       caption: detail.caption,
-      tags: detail.tags,
+      tags: tags,
       novels: detail.novels
           .map(
             (entry) => NovelSeriesEntry(
@@ -106,5 +113,29 @@ class NovelMapper {
           )
           .toList(),
     );
+  }
+
+  static List<ContentTag> _stringTags(List<String> tags) {
+    final builder = ContentTagBuilder();
+    for (final tag in tags) {
+      if (tag.trim().isEmpty) continue;
+      builder.addLabel(tag);
+    }
+    return builder.build();
+  }
+
+  static List<ContentTag> _pixivTags(List<PixivTag> tags) {
+    final builder = ContentTagBuilder();
+    for (final tag in tags) {
+      final primary = tag.name.trim();
+      if (primary.isEmpty) continue;
+      final translated = tag.translatedName?.trim();
+      builder.addLabel(
+        primary,
+        display: translated?.isNotEmpty == true ? translated : primary,
+        aliases: [if (translated != null && translated.isNotEmpty) translated],
+      );
+    }
+    return builder.build();
   }
 }

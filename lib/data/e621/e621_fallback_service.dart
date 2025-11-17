@@ -7,8 +7,8 @@ class E621FallbackService implements E621Service {
   E621FallbackService({
     required E621Service primary,
     required E621Service fallback,
-  })  : _primary = primary,
-        _fallback = fallback;
+  }) : _primary = primary,
+       _fallback = fallback;
 
   final E621Service _primary;
   final E621Service _fallback;

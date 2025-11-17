@@ -7,6 +7,7 @@ import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../data/repositories/mappers/content_mapper.dart';
 import '../../../domain/models/content_item.dart';
 import '../../../domain/models/content_page.dart';
+import '../../../core/tagging/tag_preferences_provider.dart';
 
 enum IllustrationSource { pixiv, e621 }
 
@@ -159,20 +160,26 @@ class FeedController extends StateNotifier<FeedState> {
   }
 }
 
-final illustrationFeedControllerProvider =
-    StateNotifierProvider.autoDispose
-        .family<FeedController, FeedState, IllustrationSource>((ref, source) {
+final illustrationFeedControllerProvider = StateNotifierProvider.autoDispose
+    .family<FeedController, FeedState, IllustrationSource>((ref, source) {
       switch (source) {
         case IllustrationSource.pixiv:
           final repository = ref.watch(pixivRepositoryProvider);
-          return FeedController(
+          final controller = FeedController(
             fetchPage: (page, limit) =>
                 repository.fetchIllustrations(page: page, limit: limit),
             filter: (item) => item.type == ContentType.illustration,
           );
+          ref.listen(tagPreferencesProvider, (previous, next) {
+            if (previous?.valueOrNull != next.valueOrNull) {
+              controller.refresh();
+            }
+          });
+          return controller;
         case IllustrationSource.e621:
           final service = ref.watch(e621ServiceProvider);
-          return FeedController(
+          final filterResolver = () => ref.read(tagFilterProvider);
+          final controller = FeedController(
             fetchPage: (page, limit) async {
               final posts = await service.fetchPosts(page: page, limit: limit);
               final items = posts
@@ -180,35 +187,57 @@ final illustrationFeedControllerProvider =
                   .whereType<FaioContent>()
                   .where((item) => item.type == ContentType.illustration)
                   .toList();
+              final filter = filterResolver();
+              final filtered = filter.isInactive
+                  ? items
+                  : items.where(filter.allows).toList();
               final hasMore = posts.length >= limit;
               return ContentPageResult(
-                items: items,
+                items: filtered,
                 page: page,
                 hasMore: hasMore,
               );
             },
           );
+          ref.listen(tagPreferencesProvider, (previous, next) {
+            if (previous?.valueOrNull != next.valueOrNull) {
+              controller.refresh();
+            }
+          });
+          return controller;
       }
     }, name: 'illustrationFeedControllerProvider');
 
 final pixivMangaFeedControllerProvider =
     StateNotifierProvider.autoDispose<FeedController, FeedState>((ref) {
       final repository = ref.watch(pixivRepositoryProvider);
-      return FeedController(
+      final controller = FeedController(
         fetchPage: (page, limit) =>
             repository.fetchManga(page: page, limit: limit),
         filter: (item) => item.type == ContentType.comic,
       );
+      ref.listen(tagPreferencesProvider, (previous, next) {
+        if (previous?.valueOrNull != next.valueOrNull) {
+          controller.refresh();
+        }
+      });
+      return controller;
     }, name: 'pixivMangaFeedControllerProvider');
 
 final pixivNovelFeedControllerProvider =
     StateNotifierProvider.autoDispose<FeedController, FeedState>((ref) {
       final repository = ref.watch(pixivRepositoryProvider);
-      return FeedController(
+      final controller = FeedController(
         fetchPage: (page, limit) =>
             repository.fetchNovels(page: page, limit: limit),
         filter: (item) => item.type == ContentType.novel,
       );
+      ref.listen(tagPreferencesProvider, (previous, next) {
+        if (previous?.valueOrNull != next.valueOrNull) {
+          controller.refresh();
+        }
+      });
+      return controller;
     }, name: 'pixivNovelFeedControllerProvider');
 
 final feedSelectionProvider =

@@ -222,11 +222,7 @@ class FurryNovelSeriesDetail {
 
   factory FurryNovelSeriesDetail.fromJson(Map<String, dynamic>? json) {
     if (json == null) {
-      return const FurryNovelSeriesDetail(
-        id: 0,
-        title: '',
-        caption: '',
-      );
+      return const FurryNovelSeriesDetail(id: 0, title: '', caption: '');
     }
 
     List<String> parseTags(dynamic value) {

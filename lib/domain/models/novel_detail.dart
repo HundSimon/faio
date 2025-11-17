@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'content_tag.dart';
+
 class NovelDetail extends Equatable {
   const NovelDetail({
     required this.novelId,
@@ -9,7 +11,7 @@ class NovelDetail extends Equatable {
     required this.body,
     this.authorName,
     this.authorId,
-    this.tags = const [],
+    this.tags = const <ContentTag>[],
     this.series,
     this.coverUrl,
     this.length,
@@ -28,7 +30,7 @@ class NovelDetail extends Equatable {
   final String body;
   final String? authorName;
   final int? authorId;
-  final List<String> tags;
+  final List<ContentTag> tags;
   final NovelSeriesOutline? series;
   final Uri? coverUrl;
   final int? length;
@@ -46,24 +48,24 @@ class NovelDetail extends Equatable {
 
   @override
   List<Object?> get props => [
-        novelId,
-        source,
-        title,
-        description,
-        body,
-        authorName,
-        authorId,
-        tags,
-        series,
-        coverUrl,
-        length,
-        createdAt,
-        updatedAt,
-        images,
-        sourceLinks,
-        likeCount,
-        readCount,
-      ];
+    novelId,
+    source,
+    title,
+    description,
+    body,
+    authorName,
+    authorId,
+    tags,
+    series,
+    coverUrl,
+    length,
+    createdAt,
+    updatedAt,
+    images,
+    sourceLinks,
+    likeCount,
+    readCount,
+  ];
 
   NovelDetail copyWith({
     String? source,
@@ -72,7 +74,7 @@ class NovelDetail extends Equatable {
     String? body,
     String? authorName,
     int? authorId,
-    List<String>? tags,
+    List<ContentTag>? tags,
     NovelSeriesOutline? series,
     Uri? coverUrl,
     int? length,
@@ -122,14 +124,14 @@ class NovelSeriesDetail extends Equatable {
     required this.id,
     required this.title,
     required this.caption,
-    this.tags = const [],
+    this.tags = const <ContentTag>[],
     this.novels = const [],
   });
 
   final int id;
   final String title;
   final String caption;
-  final List<String> tags;
+  final List<ContentTag> tags;
   final List<NovelSeriesEntry> novels;
 
   @override

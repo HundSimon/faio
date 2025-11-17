@@ -5,10 +5,7 @@ import '../../../domain/models/content_item.dart';
 enum LibraryFavoriteKind { content, series }
 
 class LibraryHistoryEntry extends Equatable {
-  const LibraryHistoryEntry({
-    required this.content,
-    required this.viewedAt,
-  });
+  const LibraryHistoryEntry({required this.content, required this.viewedAt});
 
   final FaioContent content;
   final DateTime viewedAt;
@@ -42,18 +39,18 @@ class LibraryFavoriteEntry extends Equatable {
   const LibraryFavoriteEntry.content({
     required FaioContent content,
     required DateTime savedAt,
-  })  : kind = LibraryFavoriteKind.content,
-        content = content,
-        series = null,
-        savedAt = savedAt;
+  }) : kind = LibraryFavoriteKind.content,
+       content = content,
+       series = null,
+       savedAt = savedAt;
 
   const LibraryFavoriteEntry.series({
     required LibrarySeriesFavorite series,
     required DateTime savedAt,
-  })  : kind = LibraryFavoriteKind.series,
-        content = null,
-        series = series,
-        savedAt = savedAt;
+  }) : kind = LibraryFavoriteKind.series,
+       content = null,
+       series = series,
+       savedAt = savedAt;
 
   final LibraryFavoriteKind kind;
   final FaioContent? content;

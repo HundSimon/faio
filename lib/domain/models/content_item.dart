@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'content_tag.dart';
+
 /// Supported content types across integrated services.
 enum ContentType { illustration, comic, novel, audio }
 
@@ -19,7 +21,7 @@ class FaioContent extends Equatable {
     this.updatedAt,
     required this.rating,
     this.authorName,
-    this.tags = const [],
+    this.tags = const <ContentTag>[],
     this.favoriteCount = 0,
     this.sourceLinks = const [],
   });
@@ -44,7 +46,7 @@ class FaioContent extends Equatable {
   final String rating;
 
   final String? authorName;
-  final List<String> tags;
+  final List<ContentTag> tags;
   final int favoriteCount;
   final List<Uri> sourceLinks;
 
@@ -80,7 +82,7 @@ class FaioContent extends Equatable {
     DateTime? updatedAt,
     String? rating,
     String? authorName,
-    List<String>? tags,
+    List<ContentTag>? tags,
     int? favoriteCount,
     List<Uri>? sourceLinks,
   }) {

@@ -14,7 +14,10 @@ class E621CredentialStorage {
     final username = await _storage.read(key: _usernameKey);
     final apiKey = await _storage.read(key: _apiKeyKey);
 
-    if (username == null || username.isEmpty || apiKey == null || apiKey.isEmpty) {
+    if (username == null ||
+        username.isEmpty ||
+        apiKey == null ||
+        apiKey.isEmpty) {
       return null;
     }
     return E621Credentials(username: username, apiKey: apiKey);

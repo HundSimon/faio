@@ -13,8 +13,8 @@ class FavoriteIconButton extends ConsumerWidget {
     this.backgroundColor,
     this.onToggled,
     super.key,
-  })  : _content = content,
-        _series = null;
+  }) : _content = content,
+       _series = null;
 
   const FavoriteIconButton.series({
     required LibrarySeriesFavorite series,
@@ -23,8 +23,8 @@ class FavoriteIconButton extends ConsumerWidget {
     this.backgroundColor,
     this.onToggled,
     super.key,
-  })  : _content = null,
-        _series = series;
+  }) : _content = null,
+       _series = series;
 
   final FaioContent? _content;
   final LibrarySeriesFavorite? _series;
@@ -43,15 +43,13 @@ class FavoriteIconButton extends ConsumerWidget {
         }
         if (_content != null) {
           return entries.any(
-            (entry) =>
-                entry.isContent && entry.content!.id == _content.id,
+            (entry) => entry.isContent && entry.content!.id == _content.id,
           );
         }
         if (_series != null) {
           return entries.any(
             (entry) =>
-                entry.isSeries &&
-                entry.series!.seriesId == _series.seriesId,
+                entry.isSeries && entry.series!.seriesId == _series.seriesId,
           );
         }
         return false;

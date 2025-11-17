@@ -31,10 +31,7 @@ class HomeShell extends StatelessWidget {
 
   void _onDestinationSelected(int index) {
     if (index == navigationShell.currentIndex) {
-      navigationShell.goBranch(
-        index,
-        initialLocation: true,
-      );
+      navigationShell.goBranch(index, initialLocation: true);
     } else {
       navigationShell.goBranch(index);
     }

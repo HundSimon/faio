@@ -6,6 +6,7 @@ import '../../../data/pixiv/pixiv_auth.dart';
 import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import 'pixiv_login_screen.dart';
+import 'tag_management_screen.dart';
 
 /// Settings hub with placeholders for upcoming configuration panels.
 class SettingsScreen extends ConsumerWidget {
@@ -31,7 +32,9 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   Text(
                     '界面主题',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -110,16 +113,29 @@ class SettingsScreen extends ConsumerWidget {
                         child: const Text('登录获取'),
                       ),
                       TextButton(
-                        onPressed: () => _editPixivCredentialsManual(
-                          context,
-                          ref,
-                        ),
+                        onPressed: () =>
+                            _editPixivCredentialsManual(context, ref),
                         child: const Text('手动录入'),
                       ),
                     ],
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: ListTile(
+              title: const Text('标签管理'),
+              subtitle: const Text('配置喜欢或屏蔽的标签，过滤信息流内容'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TagManagementScreen(),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -233,9 +249,9 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (success == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已完成 Pixiv 登录')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已完成 Pixiv 登录')));
     }
   }
 
