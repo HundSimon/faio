@@ -479,23 +479,30 @@ class _NovelDetailContent extends ConsumerStatefulWidget {
 class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
   ContentWarning? _warning;
   var _warningAcknowledged = true;
+  ProviderSubscription<ContentSafetySettings>? _contentSafetyListener;
 
   @override
   void initState() {
     super.initState();
     _syncWarning();
-    ref.listen<ContentSafetySettings>(contentSafetySettingsProvider, (
-      previous,
-      next,
-    ) {
-      if (_warning != null &&
-          next.isAutoApproved(_warning!.level) &&
-          !_warningAcknowledged) {
-        setState(() {
-          _warningAcknowledged = true;
-        });
-      }
-    });
+    _contentSafetyListener = ref.listenManual<ContentSafetySettings>(
+      contentSafetySettingsProvider,
+      (previous, next) {
+        if (_warning != null &&
+            next.isAutoApproved(_warning!.level) &&
+            !_warningAcknowledged) {
+          setState(() {
+            _warningAcknowledged = true;
+          });
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _contentSafetyListener?.close();
+    super.dispose();
   }
 
   @override

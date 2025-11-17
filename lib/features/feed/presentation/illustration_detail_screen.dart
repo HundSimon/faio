@@ -25,11 +25,18 @@ import 'illustration_hero.dart';
 import 'widgets/progressive_illustration_image.dart';
 
 Uri? _primarySourceLink(FaioContent content) {
-  if (content.originalUrl != null) {
-    return content.originalUrl;
+  if (content.source == 'e621') {
+    final rawId = content.id.split(':').last;
+    final numericId = int.tryParse(rawId);
+    if (numericId != null) {
+      return Uri.parse('https://e621.net/posts/$numericId');
+    }
   }
   if (content.sourceLinks.isNotEmpty) {
     return content.sourceLinks.first;
+  }
+  if (content.originalUrl != null) {
+    return content.originalUrl;
   }
   return null;
 }
