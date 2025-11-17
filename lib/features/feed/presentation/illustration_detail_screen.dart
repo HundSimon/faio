@@ -597,13 +597,12 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
     final baseCount = widget.content.favoriteCount;
     final displayCount = baseCount + (widget.isFavorite ? 1 : 0);
     final favoriteLabel = '${widget.isFavorite ? '已收藏' : '收藏'}（$displayCount）';
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 14);
     return Row(
       children: [
         Expanded(
           child: FilledButton.icon(
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            ),
+            style: FilledButton.styleFrom(padding: buttonPadding),
             icon: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
               transitionBuilder: (child, animation) =>
@@ -626,6 +625,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
         if (widget.primaryLink != null) ...[
           const SizedBox(width: 12),
           OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(padding: buttonPadding),
             icon: const Icon(Icons.open_in_new),
             label: const Text('查看原站'),
             onPressed: () => widget.onOpenSource(widget.primaryLink!),
