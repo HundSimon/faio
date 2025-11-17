@@ -34,6 +34,10 @@ class PixivHttpService implements PixivService {
        _onCredentialsRefreshed = onCredentialsRefreshed;
 
   static const _baseUrl = 'https://app-api.pixiv.net';
+  static final RegExp _webviewNovelRegex = RegExp(
+    r'novel:\s*(\{.+?\}),\s*isOwnWork',
+    dotAll: true,
+  );
 
   final RhttpClient _client;
   final PixivOAuthClient _oauthClient;
@@ -182,10 +186,12 @@ class PixivHttpService implements PixivService {
       var parsed = PixivNovel.fromJson(novel);
       if (parsed.text == null || parsed.text!.trim().isEmpty) {
         try {
-          final text = await _fetchNovelText(novelId);
+          final text = await fetchNovelText(novelId);
           if (text != null && text.trim().isNotEmpty) {
             parsed = parsed.copyWith(text: text);
           }
+        } on PixivAuthenticationRequiredException {
+          rethrow;
         } on RhttpStatusCodeException catch (_) {
           // Ignore fallback failures (e.g. 404) and keep existing data.
         }
@@ -195,7 +201,57 @@ class PixivHttpService implements PixivService {
     return null;
   }
 
-  Future<String?> _fetchNovelText(int novelId) async {
+  @override
+  Future<String?> fetchNovelText(int novelId) async {
+    if (novelId <= 0) {
+      return null;
+    }
+
+    try {
+      final html = await _getText(
+        path: '/webview/v2/novel',
+        queryParameters: {'id': novelId, 'viewer_version': '20221031_ai'},
+      );
+      final text = _parseNovelTextFromHtml(html);
+      if (text != null && text.trim().isNotEmpty) {
+        return text;
+      }
+    } on PixivAuthenticationRequiredException {
+      rethrow;
+    } on RhttpStatusCodeException {
+      // Fall back to the legacy text endpoint below.
+    } catch (_) {
+      // Ignore parsing/network errors and try the legacy endpoint next.
+    }
+
+    return _fetchLegacyNovelText(novelId);
+  }
+
+  String? _parseNovelTextFromHtml(String? html) {
+    if (html == null || html.isEmpty) {
+      return null;
+    }
+    final match = _webviewNovelRegex.firstMatch(html);
+    if (match == null) {
+      return null;
+    }
+    final jsonPayload = match.group(1);
+    if (jsonPayload == null || jsonPayload.isEmpty) {
+      return null;
+    }
+    try {
+      final dynamic decoded = jsonDecode(jsonPayload);
+      final text = decoded is Map<String, dynamic> ? decoded['text'] : null;
+      if (text is String && text.trim().isNotEmpty) {
+        return text;
+      }
+    } catch (_) {
+      // Ignore malformed payloads and fall back to legacy logic.
+    }
+    return null;
+  }
+
+  Future<String?> _fetchLegacyNovelText(int novelId) async {
     final response = await _getJson(
       path: '/v1/novel/text',
       queryParameters: {'novel_id': novelId},
@@ -233,6 +289,37 @@ class PixivHttpService implements PixivService {
           uri: uri,
         );
         return _decodeJson(retryResponse.body);
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> _getText({
+    String? path,
+    Map<String, dynamic>? queryParameters,
+    Uri? uri,
+  }) async {
+    final credentials = await _ensureCredentials();
+    await _rateLimiter.acquire();
+
+    try {
+      final response = await _performRequest(
+        credentials: credentials,
+        path: path,
+        queryParameters: queryParameters,
+        uri: uri,
+      );
+      return response.body;
+    } on RhttpStatusCodeException catch (error) {
+      if (_isAuthFailure(error.statusCode)) {
+        final refreshed = await _refreshCredentials(credentials);
+        final retryResponse = await _performRequest(
+          credentials: refreshed,
+          path: path,
+          queryParameters: queryParameters,
+          uri: uri,
+        );
+        return retryResponse.body;
       }
       rethrow;
     }

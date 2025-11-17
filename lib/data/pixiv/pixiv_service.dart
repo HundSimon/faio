@@ -26,4 +26,6 @@ abstract interface class PixivService {
   Future<PixivIllust?> fetchIllustrationDetail(int illustId);
 
   Future<PixivNovel?> fetchNovelDetail(int novelId);
+
+  Future<String?> fetchNovelText(int novelId);
 }

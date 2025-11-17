@@ -79,6 +79,16 @@ class PixivMockService implements PixivService {
   }
 
   @override
+  Future<String?> fetchNovelText(int novelId) async {
+    for (final novel in _novels) {
+      if (novel.id == novelId) {
+        return novel.text ?? novel.caption;
+      }
+    }
+    return null;
+  }
+
+  @override
   Future<PixivPage<PixivIllust>> searchIllustrations({
     required String query,
     int offset = 0,

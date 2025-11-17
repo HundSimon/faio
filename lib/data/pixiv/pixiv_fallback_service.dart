@@ -105,4 +105,14 @@ class PixivFallbackService implements PixivService {
       return _fallback.fetchNovelDetail(novelId);
     }
   }
+
+  @override
+  Future<String?> fetchNovelText(int novelId) async {
+    try {
+      final result = await _primary.fetchNovelText(novelId);
+      return result ?? await _fallback.fetchNovelText(novelId);
+    } catch (_) {
+      return _fallback.fetchNovelText(novelId);
+    }
+  }
 }

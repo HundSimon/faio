@@ -23,6 +23,7 @@ class PixivRepositoryImpl implements PixivRepository {
   final FurryNovelService _furryNovelService;
   final TagFilter Function() _tagFilterResolver;
   final Map<int, int> _novelLikeCountCache = {};
+  final Map<int, String> _novelBodyCache = {};
 
   @override
   Future<ContentPageResult> fetchIllustrations({
@@ -189,6 +190,10 @@ class PixivRepositoryImpl implements PixivRepository {
     if (pixivNovel == null) {
       return null;
     }
+    final novelText = pixivNovel.text;
+    if (novelText != null && novelText.trim().isNotEmpty) {
+      _novelBodyCache[pixivNovel.id] = novelText.trim();
+    }
     return NovelMapper.fromPixivNovel(pixivNovel);
   }
 
@@ -200,7 +205,9 @@ class PixivRepositoryImpl implements PixivRepository {
 
   Future<List<FaioContent>> _searchPixivNovels(String query, int limit) async {
     final response = await _service.searchNovels(query: query, limit: limit);
-    final rawItems = response.items
+    final novels = response.items.take(limit).toList();
+    final enrichedNovels = await _attachPixivNovelText(novels);
+    final rawItems = enrichedNovels
         .map(ContentMapper.fromPixivNovel)
         .whereType<FaioContent>()
         .toList();
@@ -217,6 +224,36 @@ class PixivRepositoryImpl implements PixivRepository {
         .whereType<FaioContent>()
         .toList();
     return _filterItems(rawItems);
+  }
+
+  Future<List<PixivNovel>> _attachPixivNovelText(
+    List<PixivNovel> novels,
+  ) async {
+    if (novels.isEmpty) {
+      return const <PixivNovel>[];
+    }
+    final enriched = <PixivNovel>[];
+    for (final novel in novels) {
+      final cached = _novelBodyCache[novel.id];
+      if (cached != null && cached.trim().isNotEmpty) {
+        final normalized = cached.trim();
+        enriched.add(novel.copyWith(text: normalized));
+        continue;
+      }
+      try {
+        final text = await _service.fetchNovelText(novel.id);
+        if (text != null && text.trim().isNotEmpty) {
+          final normalized = text.trim();
+          _novelBodyCache[novel.id] = normalized;
+          enriched.add(novel.copyWith(text: normalized));
+          continue;
+        }
+      } catch (_) {
+        // Ignore failures and use the original metadata as-is.
+      }
+      enriched.add(novel);
+    }
+    return enriched;
   }
 
   List<FaioContent> _dedupeNovels(Iterable<FaioContent> items) {
