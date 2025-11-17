@@ -158,87 +158,36 @@ class SettingsScreen extends ConsumerWidget {
 
   Future<void> _editE621Credentials(BuildContext context, WidgetRef ref) async {
     final credentials = ref.read(e621AuthProvider);
-    final usernameController = TextEditingController(
-      text: credentials?.username ?? '',
-    );
-    final apiKeyController = TextEditingController(
-      text: credentials?.apiKey ?? '',
-    );
-
-    final result = await showDialog<_CredentialDialogResult>(
+    final result = await showDialog<_E621CredentialDialogResult>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('配置 e621 凭证'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: usernameController,
-                decoration: const InputDecoration(labelText: '用户名'),
-                autofocus: true,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: apiKeyController,
-                decoration: const InputDecoration(labelText: 'API Key'),
-                obscureText: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_CredentialDialogResult.clear),
-              child: const Text('清除'),
-            ),
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_CredentialDialogResult.cancel),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_CredentialDialogResult.save),
-              child: const Text('保存'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => _E621CredentialDialog(
+        initialUsername: credentials?.username ?? '',
+        initialApiKey: credentials?.apiKey ?? '',
+      ),
     );
 
-    if (!context.mounted) {
-      usernameController.dispose();
-      apiKeyController.dispose();
+    if (!context.mounted || result == null) {
       return;
     }
 
-    switch (result) {
-      case _CredentialDialogResult.save:
+    switch (result.action) {
+      case _CredentialDialogAction.save:
         ref
             .read(e621AuthProvider.notifier)
-            .update(
-              username: usernameController.text,
-              apiKey: apiKeyController.text,
-            );
+            .update(username: result.username, apiKey: result.apiKey);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('已保存 e621 凭证')));
         break;
-      case _CredentialDialogResult.clear:
+      case _CredentialDialogAction.clear:
         ref.read(e621AuthProvider.notifier).clear();
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('已清除 e621 凭证')));
         break;
-      case _CredentialDialogResult.cancel:
-        break;
-      case null:
+      case _CredentialDialogAction.cancel:
         break;
     }
-
-    usernameController.dispose();
-    apiKeyController.dispose();
   }
 
   Future<void> _startPixivLogin(BuildContext context, WidgetRef ref) async {
@@ -260,57 +209,20 @@ class SettingsScreen extends ConsumerWidget {
     WidgetRef ref,
   ) async {
     final credentials = ref.read(pixivAuthProvider);
-    final refreshTokenController = TextEditingController(
-      text: credentials?.refreshToken ?? '',
-    );
-
-    final result = await showDialog<_CredentialDialogResult>(
+    final result = await showDialog<_PixivCredentialDialogResult>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('配置 Pixiv 凭证'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: refreshTokenController,
-                decoration: const InputDecoration(
-                  labelText: 'Refresh Token',
-                  helperText: '从 Pixiv 登录流程中获取的刷新令牌',
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_CredentialDialogResult.clear),
-              child: const Text('清除'),
-            ),
-            TextButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_CredentialDialogResult.cancel),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(context).pop(_CredentialDialogResult.save),
-              child: const Text('保存'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => _PixivCredentialDialog(
+        initialRefreshToken: credentials?.refreshToken ?? '',
+      ),
     );
 
-    if (!context.mounted) {
-      refreshTokenController.dispose();
+    if (!context.mounted || result == null) {
       return;
     }
 
-    switch (result) {
-      case _CredentialDialogResult.save:
-        final refreshToken = refreshTokenController.text.trim();
+    switch (result.action) {
+      case _CredentialDialogAction.save:
+        final refreshToken = result.refreshToken.trim();
         if (refreshToken.isEmpty) {
           if (!context.mounted) break;
           ScaffoldMessenger.of(
@@ -332,20 +244,198 @@ class SettingsScreen extends ConsumerWidget {
           messenger?.showSnackBar(SnackBar(content: Text('刷新失败：$error')));
         }
         break;
-      case _CredentialDialogResult.clear:
+      case _CredentialDialogAction.clear:
         ref.read(pixivAuthProvider.notifier).clear();
         if (!context.mounted) break;
         ScaffoldMessenger.maybeOf(
           context,
         )?.showSnackBar(const SnackBar(content: Text('已清除 Pixiv 凭证')));
         break;
-      case _CredentialDialogResult.cancel:
-      case null:
+      case _CredentialDialogAction.cancel:
         break;
     }
-
-    refreshTokenController.dispose();
   }
 }
 
-enum _CredentialDialogResult { save, cancel, clear }
+class _E621CredentialDialog extends StatefulWidget {
+  const _E621CredentialDialog({
+    required this.initialUsername,
+    required this.initialApiKey,
+  });
+
+  final String initialUsername;
+  final String initialApiKey;
+
+  @override
+  State<_E621CredentialDialog> createState() => _E621CredentialDialogState();
+}
+
+class _E621CredentialDialogState extends State<_E621CredentialDialog> {
+  late final TextEditingController _usernameController;
+  late final TextEditingController _apiKeyController;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController = TextEditingController(text: widget.initialUsername);
+    _apiKeyController = TextEditingController(text: widget.initialApiKey);
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
+  void _handleSave() {
+    Navigator.of(context).pop(
+      _E621CredentialDialogResult(
+        action: _CredentialDialogAction.save,
+        username: _usernameController.text,
+        apiKey: _apiKeyController.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('配置 e621 凭证'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(labelText: '用户名'),
+            autofocus: true,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _apiKeyController,
+            decoration: const InputDecoration(labelText: 'API Key'),
+            obscureText: true,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            const _E621CredentialDialogResult(
+              action: _CredentialDialogAction.clear,
+            ),
+          ),
+          child: const Text('清除'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            const _E621CredentialDialogResult(
+              action: _CredentialDialogAction.cancel,
+            ),
+          ),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _handleSave, child: const Text('保存')),
+      ],
+    );
+  }
+}
+
+class _E621CredentialDialogResult {
+  const _E621CredentialDialogResult({
+    required this.action,
+    this.username = '',
+    this.apiKey = '',
+  });
+
+  final _CredentialDialogAction action;
+  final String username;
+  final String apiKey;
+}
+
+class _PixivCredentialDialog extends StatefulWidget {
+  const _PixivCredentialDialog({required this.initialRefreshToken});
+
+  final String initialRefreshToken;
+
+  @override
+  State<_PixivCredentialDialog> createState() => _PixivCredentialDialogState();
+}
+
+class _PixivCredentialDialogState extends State<_PixivCredentialDialog> {
+  late final TextEditingController _refreshTokenController;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTokenController = TextEditingController(
+      text: widget.initialRefreshToken,
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTokenController.dispose();
+    super.dispose();
+  }
+
+  void _handleSave() {
+    Navigator.of(context).pop(
+      _PixivCredentialDialogResult(
+        action: _CredentialDialogAction.save,
+        refreshToken: _refreshTokenController.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('配置 Pixiv 凭证'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _refreshTokenController,
+            decoration: const InputDecoration(
+              labelText: 'Refresh Token',
+              helperText: '从 Pixiv 登录流程中获取的刷新令牌',
+            ),
+            maxLines: 3,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            const _PixivCredentialDialogResult(
+              action: _CredentialDialogAction.clear,
+            ),
+          ),
+          child: const Text('清除'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            const _PixivCredentialDialogResult(
+              action: _CredentialDialogAction.cancel,
+            ),
+          ),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _handleSave, child: const Text('保存')),
+      ],
+    );
+  }
+}
+
+class _PixivCredentialDialogResult {
+  const _PixivCredentialDialogResult({
+    required this.action,
+    this.refreshToken = '',
+  });
+
+  final _CredentialDialogAction action;
+  final String refreshToken;
+}
+
+enum _CredentialDialogAction { save, cancel, clear }

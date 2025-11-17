@@ -109,93 +109,120 @@ class _TagManagementScreenState extends ConsumerState<TagManagementScreen> {
   }
 
   Future<void> _showAddTagDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    var selectedStatus = ContentTagStatus.blocked;
-    final result = await showDialog<bool>(
+    final result = await showDialog<_AddTagDialogResult>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('添加标签'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: '标签名称',
-                      helperText: '不区分大小写，支持中日文本',
-                    ),
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 16),
-                  SegmentedButton<ContentTagStatus>(
-                    segments: const [
-                      ButtonSegment(
-                        value: ContentTagStatus.liked,
-                        label: Text('喜欢'),
-                        icon: Icon(Icons.favorite),
-                      ),
-                      ButtonSegment(
-                        value: ContentTagStatus.blocked,
-                        label: Text('屏蔽'),
-                        icon: Icon(Icons.block),
-                      ),
-                    ],
-                    selected: {selectedStatus},
-                    onSelectionChanged: (selection) {
-                      if (selection.isNotEmpty) {
-                        setState(() {
-                          selectedStatus = selection.first;
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('取消'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(true),
-                  child: const Text('保存'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => const _AddTagDialog(),
     );
 
-    if (!context.mounted) {
-      controller.dispose();
+    if (!context.mounted || result == null) {
       return;
     }
 
-    if (result == true) {
-      final input = controller.text.trim();
-      if (input.isEmpty) {
-        ScaffoldMessenger.maybeOf(
-          context,
-        )?.showSnackBar(const SnackBar(content: Text('请输入有效标签')));
-      } else {
-        await ref
-            .read(tagPreferencesProvider.notifier)
-            .setStatusForName(input, selectedStatus);
-        if (!context.mounted) {
-          controller.dispose();
-          return;
-        }
-        ScaffoldMessenger.maybeOf(
-          context,
-        )?.showSnackBar(SnackBar(content: Text('已添加标签：$input')));
-      }
+    final input = result.tagName.trim();
+    if (input.isEmpty) {
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('请输入有效标签')));
+      return;
     }
-    controller.dispose();
+
+    await ref
+        .read(tagPreferencesProvider.notifier)
+        .setStatusForName(input, result.status);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text('已添加标签：$input')));
   }
+}
+
+class _AddTagDialog extends StatefulWidget {
+  const _AddTagDialog();
+
+  @override
+  State<_AddTagDialog> createState() => _AddTagDialogState();
+}
+
+class _AddTagDialogState extends State<_AddTagDialog> {
+  late final TextEditingController _controller;
+  ContentTagStatus _selectedStatus = ContentTagStatus.blocked;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleSave() {
+    Navigator.of(context).pop(
+      _AddTagDialogResult(tagName: _controller.text, status: _selectedStatus),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('添加标签'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              labelText: '标签名称',
+              helperText: '不区分大小写，支持中日文本',
+            ),
+            autofocus: true,
+          ),
+          const SizedBox(height: 16),
+          SegmentedButton<ContentTagStatus>(
+            segments: const [
+              ButtonSegment(
+                value: ContentTagStatus.liked,
+                label: Text('喜欢'),
+                icon: Icon(Icons.favorite),
+              ),
+              ButtonSegment(
+                value: ContentTagStatus.blocked,
+                label: Text('屏蔽'),
+                icon: Icon(Icons.block),
+              ),
+            ],
+            selected: {_selectedStatus},
+            onSelectionChanged: (selection) {
+              if (selection.isNotEmpty) {
+                setState(() {
+                  _selectedStatus = selection.first;
+                });
+              }
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _handleSave, child: const Text('保存')),
+      ],
+    );
+  }
+}
+
+class _AddTagDialogResult {
+  const _AddTagDialogResult({required this.tagName, required this.status});
+
+  final String tagName;
+  final ContentTagStatus status;
 }
 
 class _TagSection extends StatelessWidget {
