@@ -49,11 +49,9 @@ class PixivHttpService implements PixivService {
     int limit = 30,
   }) async {
     final response = await _getJson(
-      path: '/v1/illust/recommended',
+      path: '/v2/illust/follow',
       queryParameters: {
-        'filter': 'for_android',
-        'include_ranking_label': 'true',
-        'include_privacy_policy': 'true',
+        'restrict': 'all',
         'offset': offset,
       },
     );
