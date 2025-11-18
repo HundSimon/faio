@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:go_router/go_router.dart';
@@ -110,68 +109,99 @@ class _IllustrationTab extends ConsumerStatefulWidget {
 
 class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     with TickerProviderStateMixin {
-  static const _pixivTabIndex = 0;
-  static const _e621TabIndex = 1;
   static const _horizontalPadding = 16.0;
   static const _verticalPadding = 16.0;
   static const _crossAxisSpacing = 12.0;
   static const _mainAxisSpacing = 12.0;
   static const _crossAxisCount = 2;
 
-  late final TabController _sourceTabController;
-  late final ScrollController _pixivScrollController;
-  late final ScrollController _e621ScrollController;
-  var _tabsVisible = true;
-  var _suppressVisibilityUpdates = false;
-  final Map<int, GlobalKey> _pixivItemKeys = {};
-  final Map<int, GlobalKey> _e621ItemKeys = {};
+  late final ScrollController _scrollController;
+  final Map<int, GlobalKey> _itemKeys = {};
+  ProviderSubscription<FeedState>? _mixedFeedSubscription;
+  ProviderSubscription<FeedSelectionState>? _selectionSubscription;
+
+  void _log(String message) {
+    debugPrint('[illustration-tab] $message');
+  }
 
   @override
   void initState() {
     super.initState();
-    _sourceTabController = TabController(length: 2, vsync: this);
-    _pixivScrollController = ScrollController()..addListener(_onPixivScroll);
-    _e621ScrollController = ScrollController()..addListener(_onE621Scroll);
+    _scrollController = ScrollController()..addListener(_onScroll);
+    final mixedProvider = illustrationFeedControllerProvider(
+      IllustrationSource.mixed,
+    );
+    _mixedFeedSubscription = ref.listenManual<FeedState>(
+      mixedProvider,
+      (previous, next) {
+        if (!mounted) return;
+        final previousError = previous?.lastError;
+        if (next.lastError != null && next.lastError != previousError) {
+          final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+          scaffoldMessenger?.showSnackBar(
+            SnackBar(content: Text('混合源加载失败：${next.lastError}')),
+          );
+        }
+      },
+    );
+    _selectionSubscription = ref.listenManual<FeedSelectionState>(
+      feedSelectionProvider,
+      (previous, next) {
+        if (!mounted) return;
+        final source = next.pendingScrollSource;
+        final targetIndex = next.pendingScrollIndex;
+        final shouldScroll =
+            source == IllustrationSource.mixed && targetIndex != null;
+        if (shouldScroll) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await _scrollToIndex(IllustrationSource.mixed, targetIndex);
+            final controller = ref.read(feedSelectionProvider.notifier);
+            controller.clearScrollRequest();
+            controller.clearSelection();
+          });
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
-    _pixivScrollController.removeListener(_onPixivScroll);
-    _e621ScrollController.removeListener(_onE621Scroll);
-    _pixivScrollController.dispose();
-    _e621ScrollController.dispose();
-    _sourceTabController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    _mixedFeedSubscription?.close();
+    _selectionSubscription?.close();
     super.dispose();
   }
 
-  void _onPixivScroll() {
-    if (!_pixivScrollController.hasClients) {
+  void _onScroll() {
+    if (!_scrollController.hasClients) {
       return;
     }
-    _updateTabVisibility(_pixivScrollController);
-    final position = _pixivScrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 200) {
+    final feedState = ref.read(
+      illustrationFeedControllerProvider(IllustrationSource.mixed),
+    );
+    if (feedState.isLoadingInitial || feedState.items.isEmpty) {
+      _log(
+        'Scroll ignored (loading=${feedState.isLoadingInitial}, items=${feedState.items.length})',
+      );
+      return;
+    }
+    final position = _scrollController.position;
+    // Avoid spamming pagination before the grid becomes scrollable.
+    if (position.maxScrollExtent <= 0 && position.pixels <= 0) {
+      _log('Scroll ignored (maxScrollExtent=${position.maxScrollExtent})');
+      return;
+    }
+    final threshold = position.maxScrollExtent - 200;
+    if (position.pixels >= threshold) {
+      _log(
+        'Triggering loadMore at ${position.pixels.toStringAsFixed(1)} / '
+        '${position.maxScrollExtent.toStringAsFixed(1)}',
+      );
       ref
           .read(
             illustrationFeedControllerProvider(
-              IllustrationSource.pixiv,
-            ).notifier,
-          )
-          .loadMore();
-    }
-  }
-
-  void _onE621Scroll() {
-    if (!_e621ScrollController.hasClients) {
-      return;
-    }
-    _updateTabVisibility(_e621ScrollController);
-    final position = _e621ScrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 200) {
-      ref
-          .read(
-            illustrationFeedControllerProvider(
-              IllustrationSource.e621,
+              IllustrationSource.mixed,
             ).notifier,
           )
           .loadMore();
@@ -179,27 +209,16 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
   }
 
   Future<void> _scrollToIndex(IllustrationSource source, int index) async {
+    if (source != IllustrationSource.mixed) {
+      return;
+    }
     final provider = illustrationFeedControllerProvider(source);
     final items = ref.read(provider).items;
     if (index < 0 || index >= items.length) {
       return;
     }
-    final targetTab = source == IllustrationSource.pixiv
-        ? _pixivTabIndex
-        : _e621TabIndex;
-
-    if (_sourceTabController.index != targetTab) {
-      _sourceTabController.animateTo(targetTab);
-      await Future<void>.delayed(const Duration(milliseconds: 220));
-    }
-
-    final controller = source == IllustrationSource.pixiv
-        ? _pixivScrollController
-        : _e621ScrollController;
-    final itemKeys = source == IllustrationSource.pixiv
-        ? _pixivItemKeys
-        : _e621ItemKeys;
-    if (!controller.hasClients) {
+    final itemKeys = _itemKeys;
+    if (!_scrollController.hasClients) {
       return;
     }
     Future<bool> ensureVisible() async {
@@ -216,114 +235,35 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
       return true;
     }
 
-    _setTabsVisible(true);
-    _suppressVisibilityUpdates = true;
-    try {
-      if (await ensureVisible()) {
-        return;
-      }
-      final offset = _calculateScrollOffset(controller, index);
-      await controller.animateTo(
-        offset,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 16));
-      await ensureVisible();
-    } finally {
-      _suppressVisibilityUpdates = false;
+    if (await ensureVisible()) {
+      return;
     }
+    final offset = _calculateScrollOffset(_scrollController, index);
+    await _scrollController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    await ensureVisible();
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<FeedState>(
-      illustrationFeedControllerProvider(IllustrationSource.pixiv),
-      (previous, next) {
-        if (!mounted) return;
-        final previousError = previous?.lastError;
-        if (next.lastError != null && next.lastError != previousError) {
-          final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
-          scaffoldMessenger?.showSnackBar(
-            SnackBar(content: Text('Pixiv 加载失败：${next.lastError}')),
-          );
-        }
-      },
+    final mixedProvider = illustrationFeedControllerProvider(
+      IllustrationSource.mixed,
     );
-    ref.listen<FeedState>(
-      illustrationFeedControllerProvider(IllustrationSource.e621),
-      (previous, next) {
-        if (!mounted) return;
-        final previousError = previous?.lastError;
-        if (next.lastError != null && next.lastError != previousError) {
-          final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
-          scaffoldMessenger?.showSnackBar(
-            SnackBar(content: Text('e621 加载失败：${next.lastError}')),
-          );
-        }
-      },
-    );
+    final mixedState = ref.watch(mixedProvider);
 
-    ref.listen<FeedSelectionState>(feedSelectionProvider, (previous, next) {
-      if (!mounted) return;
-      final source = next.pendingScrollSource;
-      final targetIndex = next.pendingScrollIndex;
-      if (source != null && targetIndex != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await _scrollToIndex(source, targetIndex);
-          final controller = ref.read(feedSelectionProvider.notifier);
-          controller.clearScrollRequest();
-          controller.clearSelection();
-        });
-      }
-    });
-
-    final pixivProvider = illustrationFeedControllerProvider(
-      IllustrationSource.pixiv,
-    );
-    final e621Provider = illustrationFeedControllerProvider(
-      IllustrationSource.e621,
-    );
-    final pixivState = ref.watch(pixivProvider);
-    final e621State = ref.watch(e621Provider);
-
-    return Column(
-      children: [
-        _buildSourceTabs(context),
-        Expanded(
-          child: AnimatedBuilder(
-            animation: _sourceTabController,
-            builder: (context, _) {
-              final tabIndex = _sourceTabController.index;
-              return IndexedStack(
-                index: tabIndex,
-                children: [
-                  _buildSourceGrid(
-                    context,
-                    provider: pixivProvider,
-                    controller: _pixivScrollController,
-                    state: pixivState,
-                    source: IllustrationSource.pixiv,
-                    emptyTitle: '暂时没有 Pixiv 插画',
-                    emptySubtitle: '下拉刷新可重新获取随机精选作品',
-                    emptyIcon: Icons.casino_outlined,
-                  ),
-                  _buildSourceGrid(
-                    context,
-                    provider: e621Provider,
-                    controller: _e621ScrollController,
-                    state: e621State,
-                    source: IllustrationSource.e621,
-                    emptyTitle: '暂时没有 e621 插画',
-                    emptySubtitle: '下拉刷新即可查看最新倒序内容',
-                    emptyIcon: Icons.schedule_outlined,
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
+    return _buildSourceGrid(
+      context,
+      provider: mixedProvider,
+      controller: _scrollController,
+      state: mixedState,
+      source: IllustrationSource.mixed,
+      emptyTitle: '暂时没有插画',
+      emptySubtitle: '下拉刷新即可重新获取最新内容',
+      emptyIcon: Icons.photo_outlined,
     );
   }
 
@@ -337,68 +277,6 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     final rowHeight = tileWidth + _mainAxisSpacing;
     final minRows = (size.height / rowHeight).ceil() + 1;
     return math.max(minRows * _crossAxisCount, _crossAxisCount * 4);
-  }
-
-  Widget _buildSourceTabs(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final tabBar = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(
-            theme.brightness == Brightness.dark ? 0.4 : 0.6,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: TabBar(
-          controller: _sourceTabController,
-          indicator: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          dividerColor: Colors.transparent,
-          indicatorSize: TabBarIndicatorSize.tab,
-          labelPadding: EdgeInsets.zero,
-          tabs: [
-            Tab(
-              child: _SourceTabLabel(
-                label: 'Pixiv',
-                color: colorScheme.primary,
-              ),
-            ),
-            Tab(
-              child: _SourceTabLabel(
-                label: 'e621',
-                color: colorScheme.tertiary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    return ClipRect(
-      child: AnimatedAlign(
-        alignment: Alignment.topCenter,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeInOut,
-        heightFactor: _tabsVisible ? 1 : 0,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 180),
-          opacity: _tabsVisible ? 1 : 0,
-          child: tabBar,
-        ),
-      ),
-    );
   }
 
   Widget _buildSourceGrid(
@@ -418,9 +296,7 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
         ? _estimateIllustrationSkeletonCount(context)
         : 0;
     final showLoadMore = !shouldShowSkeleton && state.hasMore;
-    final itemKeys = source == IllustrationSource.pixiv
-        ? _pixivItemKeys
-        : _e621ItemKeys;
+    final itemKeys = _itemKeys;
     if (!shouldShowSkeleton) {
       itemKeys.removeWhere((key, _) => key >= state.items.length);
     }
@@ -516,28 +392,6 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     return targetOffset.clamp(0.0, maxScroll);
   }
 
-  void _updateTabVisibility(ScrollController controller) {
-    if (_suppressVisibilityUpdates || !controller.hasClients) {
-      return;
-    }
-    final position = controller.position;
-    final direction = position.userScrollDirection;
-    final isNearTop = position.pixels <= (position.minScrollExtent + 8.0);
-    if (direction == ScrollDirection.reverse && !isNearTop) {
-      _setTabsVisible(false);
-    } else if (direction == ScrollDirection.forward || isNearTop) {
-      _setTabsVisible(true);
-    }
-  }
-
-  void _setTabsVisible(bool visible) {
-    if (_tabsVisible == visible) {
-      return;
-    }
-    setState(() {
-      _tabsVisible = visible;
-    });
-  }
 }
 
 class _MangaTab extends ConsumerStatefulWidget {
@@ -933,36 +787,6 @@ class _IllustrationSkeletonTile extends StatelessWidget {
           child: Container(color: color),
         ),
       ),
-    );
-  }
-}
-
-class _SourceTabLabel extends StatelessWidget {
-  const _SourceTabLabel({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 }

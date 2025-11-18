@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -33,6 +34,9 @@ class ContentRepositoryImpl implements ContentRepository {
       StreamController<List<FaioContent>>.broadcast();
   bool _initialized = false;
   bool _disposed = false;
+  void _log(String message) {
+    developer.log(message, name: 'ContentRepository');
+  }
 
   @override
   Stream<List<FaioContent>> watchFeed() {
@@ -91,6 +95,9 @@ class ContentRepositoryImpl implements ContentRepository {
       }
     }
 
+    _log(
+      'fetchFeedPage(page=$page, limit=$limit, tags=$normalizedTags)',
+    );
     sources.add(
       safeFetch(
         'e621',
@@ -125,8 +132,15 @@ class ContentRepositoryImpl implements ContentRepository {
     }
 
     if (filtered.length > limit) {
-      return filtered.sublist(0, limit);
+      final sliced = filtered.sublist(0, limit);
+      _log(
+        'Returning ${sliced.length} items (sliced from ${filtered.length}) for page=$page',
+      );
+      return sliced;
     }
+    _log(
+      'Returning ${filtered.length} items for page=$page (no slicing needed)',
+    );
     return filtered;
   }
 
@@ -246,6 +260,9 @@ class ContentRepositoryImpl implements ContentRepository {
     required int limit,
     required List<String> tags,
   }) async {
+    _log(
+      'Fetching e621 posts (page=$page, limit=$limit, tags=${tags.join(' ')})',
+    );
     final posts = await _e621Service.fetchPosts(
       page: page,
       limit: limit,
@@ -257,20 +274,27 @@ class ContentRepositoryImpl implements ContentRepository {
         .whereType<FaioContent>()
         .where((item) => item.type == ContentType.illustration)
         .toList();
-    return _filterItems(items);
+    final filtered = _filterItems(items);
+    _log(
+      'Fetched ${filtered.length} e621 items (page=$page, limit=$limit)',
+    );
+    return filtered;
   }
 
   Future<List<FaioContent>> _fetchPixiv({
     required int page,
     required int limit,
   }) async {
+    _log('Fetching pixiv illustrations (page=$page, limit=$limit)');
     final result = await _pixivRepository.fetchIllustrations(
       page: page,
       limit: limit,
     );
-    return result.items
+    final items = result.items
         .where((item) => item.type == ContentType.illustration)
         .toList();
+    _log('Fetched ${items.length} pixiv items (page=$page, limit=$limit)');
+    return items;
   }
 
   Future<List<FaioContent>> _searchE621({

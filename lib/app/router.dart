@@ -26,6 +26,8 @@ abstract final class AppRoute {
 
 IllustrationSource? _illustrationSourceFromParam(String? value) {
   switch (value?.toLowerCase()) {
+    case 'mixed':
+      return IllustrationSource.mixed;
     case 'pixiv':
       return IllustrationSource.pixiv;
     case 'e621':
