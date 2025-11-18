@@ -562,9 +562,9 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
         initialContent?.previewUrl;
     final authorName =
         detail.authorName ?? initialContent?.authorName ?? '未知作者';
-    final summary = detail.description.isNotEmpty
-        ? detail.description
-        : detail.body;
+    final summary = _normalizeNovelSummary(
+      detail.description.isNotEmpty ? detail.description : detail.body,
+    );
     final tags = detail.tags.isNotEmpty
         ? detail.tags
         : (initialContent?.tags ?? const <ContentTag>[]);
@@ -1032,6 +1032,70 @@ Future<void> _openNovelChapterSelector(
   }
   if (!context.mounted) return;
   context.pushReplacement('/feed/novel/$selected');
+}
+
+String _normalizeNovelSummary(String input) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) {
+    return trimmed;
+  }
+
+  var normalized = input.replaceAll('\r\n', '\n');
+  normalized = normalized.replaceAll(
+    RegExp(r'<br\s*/?>', caseSensitive: false),
+    '\n',
+  );
+  normalized = normalized.replaceAll(
+    RegExp(r'</p>', caseSensitive: false),
+    '\n\n',
+  );
+  normalized = normalized.replaceAll(
+    RegExp(r'<p\b[^>]*>', caseSensitive: false),
+    '',
+  );
+  normalized = normalized.replaceAll(
+    RegExp(r'<div\b[^>]*>', caseSensitive: false),
+    '\n',
+  );
+  normalized = normalized.replaceAll(RegExp(r'<[^>]+>'), '');
+  normalized = normalized.replaceAllMapped(
+    RegExp(r'&(#x?[0-9a-fA-F]+|[a-zA-Z]+);'),
+    (match) => _decodeHtmlEntity(match.group(0)!),
+  );
+  normalized = normalized.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+  final lines =
+      normalized.split('\n').map((line) => line.trimRight()).toList();
+  return lines.join('\n').trim();
+}
+
+String _decodeHtmlEntity(String entity) {
+  const namedEntities = <String, String>{
+    '&nbsp;': ' ',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&amp;': '&',
+    '&quot;': '"',
+    '&apos;': '\'',
+  };
+  final named = namedEntities[entity.toLowerCase()];
+  if (named != null) {
+    return named;
+  }
+  if (entity.startsWith('&#x') || entity.startsWith('&#X')) {
+    final code = int.tryParse(
+      entity.substring(3, entity.length - 1),
+      radix: 16,
+    );
+    if (code != null) {
+      return String.fromCharCode(code);
+    }
+  } else if (entity.startsWith('&#')) {
+    final code = int.tryParse(entity.substring(2, entity.length - 1));
+    if (code != null) {
+      return String.fromCharCode(code);
+    }
+  }
+  return entity;
 }
 
 class _ReadActionCard extends StatelessWidget {
