@@ -24,6 +24,7 @@ class FaioContent extends Equatable {
     this.tags = const <ContentTag>[],
     this.favoriteCount = 0,
     this.sourceLinks = const [],
+    this.imagePages = const <ContentImageVariant>[],
   });
 
   /// Unique identifier with source prefix (e.g. `pixiv:123456`).
@@ -49,6 +50,7 @@ class FaioContent extends Equatable {
   final List<ContentTag> tags;
   final int favoriteCount;
   final List<Uri> sourceLinks;
+  final List<ContentImageVariant> imagePages;
 
   @override
   List<Object?> get props => [
@@ -68,6 +70,7 @@ class FaioContent extends Equatable {
     tags,
     favoriteCount,
     sourceLinks,
+    imagePages,
   ];
 
   FaioContent copyWith({
@@ -85,6 +88,7 @@ class FaioContent extends Equatable {
     List<ContentTag>? tags,
     int? favoriteCount,
     List<Uri>? sourceLinks,
+    List<ContentImageVariant>? imagePages,
   }) {
     return FaioContent(
       id: id,
@@ -103,6 +107,22 @@ class FaioContent extends Equatable {
       tags: tags ?? this.tags,
       favoriteCount: favoriteCount ?? this.favoriteCount,
       sourceLinks: sourceLinks ?? this.sourceLinks,
+      imagePages: imagePages ?? this.imagePages,
     );
   }
+}
+
+class ContentImageVariant {
+  const ContentImageVariant({
+    this.previewUrl,
+    this.sampleUrl,
+    this.originalUrl,
+  });
+
+  final Uri? previewUrl;
+  final Uri? sampleUrl;
+  final Uri? originalUrl;
+
+  bool get hasAny =>
+      previewUrl != null || sampleUrl != null || originalUrl != null;
 }

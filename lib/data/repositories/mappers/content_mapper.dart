@@ -69,16 +69,21 @@ class ContentMapper {
   }
 
   static FaioContent? fromPixivIllust(PixivIllust illust) {
+    final imagePages = _pixivImageVariants(illust);
+    final firstVariant = imagePages.isNotEmpty ? imagePages.first : null;
     final previewImage =
+        firstVariant?.previewUrl ??
         illust.imageUrls.medium ??
         illust.imageUrls.large ??
         illust.metaPages.firstOrNull?.imageUrls.medium ??
         illust.imageUrls.squareMedium;
     final sampleImage =
+        firstVariant?.sampleUrl ??
         illust.imageUrls.large ??
         illust.metaPages.firstOrNull?.imageUrls.large ??
         illust.imageUrls.medium;
     final originalImage =
+        firstVariant?.originalUrl ??
         illust.originalImageUrl ??
         illust.imageUrls.original ??
         illust.metaPages.firstOrNull?.imageUrls.original;
@@ -113,6 +118,7 @@ class ContentMapper {
       tags: tags,
       favoriteCount: illust.totalBookmarks,
       sourceLinks: [Uri.parse('https://www.pixiv.net/artworks/${illust.id}')],
+      imagePages: imagePages,
     );
   }
 
@@ -287,6 +293,34 @@ class ContentMapper {
       return 'Mature';
     }
     return 'General';
+  }
+
+  static List<ContentImageVariant> _pixivImageVariants(PixivIllust illust) {
+    final variants = <ContentImageVariant>[];
+    void addVariant(PixivImageUrls urls, {Uri? originalOverride}) {
+      final preview =
+          urls.medium ?? urls.large ?? urls.squareMedium ?? originalOverride;
+      final sample =
+          urls.large ?? urls.medium ?? urls.squareMedium ?? originalOverride;
+      final original = originalOverride ?? urls.original;
+      final variant = ContentImageVariant(
+        previewUrl: preview,
+        sampleUrl: sample,
+        originalUrl: original ?? sample ?? preview,
+      );
+      if (variant.hasAny) {
+        variants.add(variant);
+      }
+    }
+
+    addVariant(
+      illust.imageUrls,
+      originalOverride: illust.originalImageUrl ?? illust.imageUrls.original,
+    );
+    for (final page in illust.metaPages) {
+      addVariant(page.imageUrls);
+    }
+    return variants;
   }
 }
 

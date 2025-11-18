@@ -354,6 +354,8 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
   late final Animation<double> _burstOpacity;
   late final Animation<double> _burstScale;
   var _isSavingImage = false;
+  late final PageController _heroPageController;
+  int _heroPageIndex = 0;
 
   @override
   void initState() {
@@ -378,11 +380,13 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
         curve: Curves.elasticOut,
       ),
     );
+    _heroPageController = PageController();
   }
 
   @override
   void dispose() {
     _favoriteBurstController.dispose();
+    _heroPageController.dispose();
     super.dispose();
   }
 
@@ -397,6 +401,15 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
         });
       }
     }
+    if (oldWidget.content.id != widget.content.id) {
+      _heroPageIndex = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_heroPageController.hasClients) {
+          _heroPageController.jumpToPage(0);
+        }
+      });
+    }
   }
 
   @override
@@ -404,10 +417,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
     final theme = Theme.of(context);
     final content = widget.content;
     final aspectRatio = (content.previewAspectRatio ?? 1).clamp(0.4, 1.8);
-    final heroPreview =
-        content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
-    final heroHighRes =
-        content.sampleUrl ?? content.originalUrl ?? content.previewUrl;
+    final heroImages = _contentImagePages(content);
     final hasSummary = content.summary.trim().isNotEmpty;
     final warning = _warning;
     final isBlocked = widget.safetySettings.isBlocked(warning?.level);
@@ -450,7 +460,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
     final body = ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
-        _buildHero(context, aspectRatio, heroPreview, heroHighRes),
+        _buildHero(context, aspectRatio, heroImages),
         const SizedBox(height: 20),
         Text(
           content.title,
@@ -502,11 +512,10 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
   Widget _buildHero(
     BuildContext context,
     double aspectRatio,
-    Uri? heroPreview,
-    Uri? heroHighRes,
+    List<ContentImageVariant> heroImages,
   ) {
     final theme = Theme.of(context);
-    if (heroPreview == null && heroHighRes == null) {
+    if (heroImages.isEmpty) {
       return Container(
         height: 280,
         alignment: Alignment.center,
@@ -522,6 +531,20 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
       );
     }
     final content = widget.content;
+    final hasMultiple = heroImages.length > 1;
+    Widget buildPage(ContentImageVariant variant) {
+      final lowRes =
+          variant.previewUrl ?? variant.sampleUrl ?? variant.originalUrl;
+      final highRes =
+          variant.sampleUrl ?? variant.originalUrl ?? variant.previewUrl;
+      return ProgressiveIllustrationImage(
+        content: content,
+        lowRes: lowRes,
+        highRes: highRes,
+        fit: BoxFit.cover,
+      );
+    }
+
     final heroChild = OpenContainer(
       closedElevation: 0,
       openElevation: 0,
@@ -533,8 +556,10 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
         borderRadius: BorderRadius.circular(28),
       ),
       tappable: false,
-      openBuilder: (context, _) =>
-          _IllustrationFullscreenView(content: widget.content),
+      openBuilder: (context, _) => _IllustrationFullscreenView(
+        content: widget.content,
+        initialIndex: _heroPageIndex,
+      ),
       closedBuilder: (context, openContainer) {
         return GestureDetector(
           onTap: openContainer,
@@ -547,12 +572,22 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ProgressiveIllustrationImage(
-                    content: content,
-                    lowRes: heroPreview,
-                    highRes: heroHighRes,
-                    fit: BoxFit.cover,
-                  ),
+                  if (hasMultiple)
+                    PageView.builder(
+                      controller: _heroPageController,
+                      itemCount: heroImages.length,
+                      onPageChanged: (value) {
+                        if (_heroPageIndex != value) {
+                          setState(() {
+                            _heroPageIndex = value;
+                          });
+                        }
+                      },
+                      itemBuilder: (context, index) =>
+                          buildPage(heroImages[index]),
+                    )
+                  else
+                    buildPage(heroImages.first),
                   Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -567,6 +602,28 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
                       ),
                     ),
                   ),
+                  if (hasMultiple)
+                    Positioned(
+                      bottom: 16,
+                      right: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.55),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${_heroPageIndex + 1}/${heroImages.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                   Positioned.fill(
                     child: IgnorePointer(
                       child: FadeTransition(
@@ -830,7 +887,17 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
       return;
     }
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final heroPages = _contentImagePages(widget.content);
+    final currentIndex = heroPages.isNotEmpty
+        ? math.max(0, math.min(_heroPageIndex, heroPages.length - 1))
+        : 0;
+    final currentVariant = heroPages.isNotEmpty
+        ? heroPages[currentIndex]
+        : null;
     final imageUrl =
+        currentVariant?.originalUrl ??
+        currentVariant?.sampleUrl ??
+        currentVariant?.previewUrl ??
         widget.content.originalUrl ??
         widget.content.sampleUrl ??
         widget.content.previewUrl;
@@ -848,10 +915,11 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
         headers: headers ?? const <String, String>{},
       );
       final bytes = await file.readAsBytes();
+      final suffix = heroPages.length > 1 ? '_p${currentIndex + 1}' : '';
       final result = await ImageGallerySaver.saveImage(
         Uint8List.fromList(bytes),
         quality: 100,
-        name: 'faio_${widget.content.id.replaceAll(':', '_')}',
+        name: 'faio_${widget.content.id.replaceAll(':', '_')}$suffix',
       );
       final success = _isSaveSuccessful(result);
       messenger?.showSnackBar(
@@ -914,48 +982,122 @@ class _InfoBadge extends StatelessWidget {
 
 enum _HeroAction { save, copyLink }
 
-class _IllustrationFullscreenView extends StatelessWidget {
-  const _IllustrationFullscreenView({required this.content});
+class _IllustrationFullscreenView extends StatefulWidget {
+  const _IllustrationFullscreenView({
+    required this.content,
+    this.initialIndex = 0,
+  });
 
   final FaioContent content;
+  final int initialIndex;
+
+  @override
+  State<_IllustrationFullscreenView> createState() =>
+      _IllustrationFullscreenViewState();
+}
+
+class _IllustrationFullscreenViewState
+    extends State<_IllustrationFullscreenView> {
+  late final PageController _pageController;
+  late int _currentIndex;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final pages = _contentImagePages(widget.content);
+    _currentIndex = pages.isEmpty
+        ? 0
+        : math.max(0, math.min(widget.initialIndex, pages.length - 1));
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _handleZoomChanged(bool zoomed) {
+    if (_isZoomed == zoomed) {
+      return;
+    }
+    setState(() {
+      _isZoomed = zoomed;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final preview =
-        content.previewUrl ?? content.sampleUrl ?? content.originalUrl;
-    final highRes =
-        content.originalUrl ?? content.sampleUrl ?? content.previewUrl;
+    final pages = _contentImagePages(widget.content);
     final ratingWarning = evaluateContentWarning(
-      rating: content.rating,
-      tags: content.tags,
+      rating: widget.content.rating,
+      tags: widget.content.tags,
     );
     final ratingLabel = ratingWarning?.label ?? 'General';
+    final mediaQuery = MediaQuery.of(context);
+    final body = pages.isEmpty
+        ? const Center(
+            child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
+          )
+        : PageView.builder(
+            controller: _pageController,
+            physics: _isZoomed
+                ? const NeverScrollableScrollPhysics()
+                : const BouncingScrollPhysics(),
+            itemCount: pages.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index;
+                _isZoomed = false;
+              });
+            },
+            itemBuilder: (context, index) {
+              return _ZoomableIllustrationPage(
+                key: ValueKey('fullscreen_${widget.content.id}_$index'),
+                content: widget.content,
+                variant: pages[index],
+                onZoomChanged: _handleZoomChanged,
+              );
+            },
+          );
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 4,
-              child: ProgressiveIllustrationImage(
-                content: content,
-                lowRes: preview,
-                highRes: highRes,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
+          Positioned.fill(child: body),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
+            top: mediaQuery.padding.top + 12,
             left: 12,
             child: IconButton(
               icon: const Icon(Icons.close, color: Colors.white),
               onPressed: () => Navigator.of(context).maybePop(),
             ),
           ),
+          if (pages.length > 1)
+            Positioned(
+              bottom: mediaQuery.padding.bottom + 32,
+              right: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${_currentIndex + 1}/${pages.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 32,
+            bottom: mediaQuery.padding.bottom + 32,
             left: 24,
             right: 24,
             child: Column(
@@ -963,7 +1105,7 @@ class _IllustrationFullscreenView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  content.title,
+                  widget.content.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -973,7 +1115,7 @@ class _IllustrationFullscreenView extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${content.authorName?.isNotEmpty == true ? content.authorName! : '匿名作者'} · $ratingLabel',
+                  '${widget.content.authorName?.isNotEmpty == true ? widget.content.authorName! : '匿名作者'} · $ratingLabel',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
@@ -1023,6 +1165,117 @@ class _DetailEndOfListPlaceholder extends StatelessWidget {
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),
+      ),
+    );
+  }
+}
+
+List<ContentImageVariant> _contentImagePages(FaioContent content) {
+  if (content.imagePages.isNotEmpty) {
+    return content.imagePages;
+  }
+  final fallback = ContentImageVariant(
+    previewUrl: content.previewUrl,
+    sampleUrl: content.sampleUrl,
+    originalUrl: content.originalUrl,
+  );
+  if (fallback.hasAny) {
+    return [fallback];
+  }
+  return const [];
+}
+
+class _ZoomableIllustrationPage extends StatefulWidget {
+  const _ZoomableIllustrationPage({
+    super.key,
+    required this.content,
+    required this.variant,
+    required this.onZoomChanged,
+  });
+
+  final FaioContent content;
+  final ContentImageVariant variant;
+  final ValueChanged<bool> onZoomChanged;
+
+  @override
+  State<_ZoomableIllustrationPage> createState() =>
+      _ZoomableIllustrationPageState();
+}
+
+class _ZoomableIllustrationPageState extends State<_ZoomableIllustrationPage> {
+  late final TransformationController _controller;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TransformationController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ZoomableIllustrationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.variant.previewUrl != widget.variant.previewUrl ||
+        oldWidget.variant.sampleUrl != widget.variant.sampleUrl ||
+        oldWidget.variant.originalUrl != widget.variant.originalUrl) {
+      _resetZoom();
+    }
+  }
+
+  void _resetZoom() {
+    _controller.value = Matrix4.identity();
+    if (_isZoomed) {
+      setState(() {
+        _isZoomed = false;
+      });
+      widget.onZoomChanged(false);
+    }
+  }
+
+  void _handleInteractionUpdate() {
+    final zoomed = _controller.value.getMaxScaleOnAxis() > 1.01;
+    if (_isZoomed == zoomed) {
+      return;
+    }
+    setState(() {
+      _isZoomed = zoomed;
+    });
+    widget.onZoomChanged(zoomed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lowRes =
+        widget.variant.previewUrl ??
+        widget.variant.sampleUrl ??
+        widget.variant.originalUrl;
+    final highRes =
+        widget.variant.sampleUrl ??
+        widget.variant.originalUrl ??
+        widget.variant.previewUrl;
+    return InteractiveViewer(
+      transformationController: _controller,
+      panEnabled: _isZoomed,
+      minScale: 1,
+      maxScale: 4,
+      onInteractionUpdate: (_) => _handleInteractionUpdate(),
+      onInteractionEnd: (_) {
+        _handleInteractionUpdate();
+        if (!_isZoomed) {
+          _controller.value = Matrix4.identity();
+        }
+      },
+      child: ProgressiveIllustrationImage(
+        content: widget.content,
+        lowRes: lowRes,
+        highRes: highRes,
+        fit: BoxFit.contain,
       ),
     );
   }

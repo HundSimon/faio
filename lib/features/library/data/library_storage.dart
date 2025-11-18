@@ -170,6 +170,10 @@ Map<String, dynamic>? _encodeContent(FaioContent content) {
     'tags': content.tags.map((tag) => tag.toJson()).toList(),
     'favoriteCount': content.favoriteCount,
     'sourceLinks': content.sourceLinks.map((uri) => uri.toString()).toList(),
+    'imagePages': content.imagePages
+        .map(_encodeImageVariant)
+        .whereType<Map<String, dynamic>>()
+        .toList(),
   };
 }
 
@@ -228,6 +232,7 @@ FaioContent? _decodeContent(Map<String, dynamic>? json) {
         .map((e) => _tryParseUri(e as String?))
         .whereType<Uri>()
         .toList(),
+    imagePages: _decodeImagePages(json['imagePages']),
   );
 }
 
@@ -289,4 +294,39 @@ DateTime? _tryParseDate(String? raw) {
     return null;
   }
   return DateTime.tryParse(raw);
+}
+
+Map<String, dynamic>? _encodeImageVariant(ContentImageVariant variant) {
+  if (!variant.hasAny) {
+    return null;
+  }
+  return {
+    'previewUrl': variant.previewUrl?.toString(),
+    'sampleUrl': variant.sampleUrl?.toString(),
+    'originalUrl': variant.originalUrl?.toString(),
+  };
+}
+
+List<ContentImageVariant> _decodeImagePages(dynamic raw) {
+  if (raw is! List) {
+    return const [];
+  }
+  final variants = <ContentImageVariant>[];
+  for (final entry in raw) {
+    if (entry is! Map<String, dynamic>) {
+      continue;
+    }
+    final preview = _tryParseUri(entry['previewUrl'] as String?);
+    final sample = _tryParseUri(entry['sampleUrl'] as String?);
+    final original = _tryParseUri(entry['originalUrl'] as String?);
+    final variant = ContentImageVariant(
+      previewUrl: preview,
+      sampleUrl: sample,
+      originalUrl: original,
+    );
+    if (variant.hasAny) {
+      variants.add(variant);
+    }
+  }
+  return variants;
 }
