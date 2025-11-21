@@ -131,19 +131,19 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     final mixedProvider = illustrationFeedControllerProvider(
       IllustrationSource.mixed,
     );
-    _mixedFeedSubscription = ref.listenManual<FeedState>(
-      mixedProvider,
-      (previous, next) {
-        if (!mounted) return;
-        final previousError = previous?.lastError;
-        if (next.lastError != null && next.lastError != previousError) {
-          final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
-          scaffoldMessenger?.showSnackBar(
-            SnackBar(content: Text('混合源加载失败：${next.lastError}')),
-          );
-        }
-      },
-    );
+    _mixedFeedSubscription = ref.listenManual<FeedState>(mixedProvider, (
+      previous,
+      next,
+    ) {
+      if (!mounted) return;
+      final previousError = previous?.lastError;
+      if (next.lastError != null && next.lastError != previousError) {
+        final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+        scaffoldMessenger?.showSnackBar(
+          SnackBar(content: Text('混合源加载失败：${next.lastError}')),
+        );
+      }
+    });
     _selectionSubscription = ref.listenManual<FeedSelectionState>(
       feedSelectionProvider,
       (previous, next) {
@@ -290,6 +290,7 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     required String emptySubtitle,
     required IconData emptyIcon,
   }) {
+    final theme = Theme.of(context);
     final notifier = ref.read(provider.notifier);
     final shouldShowSkeleton = state.isLoadingInitial && state.items.isEmpty;
     final skeletonCount = shouldShowSkeleton
@@ -302,7 +303,6 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     }
 
     if (!shouldShowSkeleton && state.items.isEmpty) {
-      final theme = Theme.of(context);
       return RefreshIndicator(
         onRefresh: notifier.refresh,
         child: ListView(
@@ -339,12 +339,14 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     final itemCount = shouldShowSkeleton
         ? skeletonCount
         : state.items.length + (showLoadMore ? 1 : 0);
+    final skeletonBaseColor = theme.colorScheme.surfaceContainerHighest;
 
     return RefreshIndicator(
       onRefresh: notifier.refresh,
       child: Skeletonizer(
-        effect: kFaioSkeletonEffect,
+        effect: themedFaioSkeletonEffect(skeletonBaseColor),
         enabled: shouldShowSkeleton,
+        containersColor: skeletonBaseColor,
         child: MasonryGridView.count(
           controller: controller,
           physics: const AlwaysScrollableScrollPhysics(),
@@ -352,6 +354,7 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
             horizontal: _horizontalPadding,
             vertical: _verticalPadding,
           ),
+          cacheExtent: 0,
           crossAxisSpacing: _crossAxisSpacing,
           mainAxisSpacing: _mainAxisSpacing,
           crossAxisCount: _crossAxisCount,
@@ -391,7 +394,6 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     final maxScroll = controller.position.maxScrollExtent;
     return targetOffset.clamp(0.0, maxScroll);
   }
-
 }
 
 class _MangaTab extends ConsumerStatefulWidget {
@@ -1231,7 +1233,7 @@ class _NovelListSkeletonItem extends StatelessWidget {
   }
 }
 
-class _ContentTile extends StatelessWidget {
+class _ContentTile extends StatefulWidget {
   const _ContentTile({required this.item, this.onTap, this.blurLabel});
 
   final FaioContent item;
@@ -1239,10 +1241,28 @@ class _ContentTile extends StatelessWidget {
   final String? blurLabel;
 
   @override
+  State<_ContentTile> createState() => _ContentTileState();
+}
+
+class _ContentTileState extends State<_ContentTile> {
+  bool _hasFirstFrame = false;
+
+  @override
+  void didUpdateWidget(covariant _ContentTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item.id != oldWidget.item.id) {
+      _hasFirstFrame = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final lowRes = item.previewUrl ?? item.sampleUrl ?? item.originalUrl;
-    final highRes = item.sampleUrl ?? item.originalUrl;
+    final lowRes =
+        widget.item.previewUrl ??
+        widget.item.sampleUrl ??
+        widget.item.originalUrl;
+    final highRes = widget.item.sampleUrl ?? widget.item.originalUrl;
     Widget placeholder({IconData? icon}) {
       return Container(
         color: theme.colorScheme.surfaceContainerHighest,
@@ -1253,39 +1273,45 @@ class _ContentTile extends StatelessWidget {
       );
     }
 
-    Widget child;
+    late final Widget image;
     if (lowRes != null || highRes != null) {
-      child = DecoratedBox(
+      image = DecoratedBox(
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest,
         ),
         child: ProgressiveIllustrationImage(
-          content: item,
+          content: widget.item,
           lowRes: lowRes,
           highRes: highRes,
           fit: BoxFit.cover,
+          onFirstFrameShown: () {
+            if (_hasFirstFrame) return;
+            setState(() => _hasFirstFrame = true);
+          },
         ),
       );
     } else {
-      child = placeholder(icon: Icons.image);
+      image = placeholder(icon: Icons.image);
     }
-    if (blurLabel != null) {
+
+    Widget child = image;
+    if (widget.blurLabel != null) {
       child = BlurredGateOverlay(
-        label: blurLabel!,
+        label: widget.blurLabel!,
         borderRadius: BorderRadius.circular(12),
-        child: child,
+        child: _hasFirstFrame ? image : placeholder(),
       );
     }
 
     return Hero(
-      tag: illustrationHeroTag(item.id),
+      tag: illustrationHeroTag(widget.item.id),
       transitionOnUserGestures: true,
       createRectTween: illustrationHeroRectTween,
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(onTap: onTap, child: child),
+        child: InkWell(onTap: widget.onTap, child: child),
       ),
     );
   }

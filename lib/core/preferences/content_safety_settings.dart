@@ -16,18 +16,22 @@ class ContentSafetySettings {
   const ContentSafetySettings({
     this.adultVisibility = ContentVisibility.blur,
     this.extremeVisibility = ContentVisibility.blur,
+    this.isLoaded = false,
   });
 
   final ContentVisibility adultVisibility;
   final ContentVisibility extremeVisibility;
+  final bool isLoaded;
 
   ContentSafetySettings copyWith({
     ContentVisibility? adultVisibility,
     ContentVisibility? extremeVisibility,
+    bool? isLoaded,
   }) {
     return ContentSafetySettings(
       adultVisibility: adultVisibility ?? this.adultVisibility,
       extremeVisibility: extremeVisibility ?? this.extremeVisibility,
+      isLoaded: isLoaded ?? this.isLoaded,
     );
   }
 
@@ -64,35 +68,31 @@ final contentSafetySettingsProvider =
 class ContentSafetySettingsNotifier
     extends StateNotifier<ContentSafetySettings> {
   ContentSafetySettingsNotifier(this._prefsFuture)
-    : super(const ContentSafetySettings()) {
+    : super(_cachedInitial ?? const ContentSafetySettings()) {
     _load();
   }
 
   final Future<SharedPreferences> _prefsFuture;
 
-  Future<void> _load() async {
-    final prefs = await _prefsFuture;
-    state = ContentSafetySettings(
+  static ContentSafetySettings? _cachedInitial;
+  static SharedPreferences? _cachedPrefs;
+
+  static Future<void> preload() async {
+    final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+    _cachedInitial = _fromPrefs(prefs);
+  }
+
+  static ContentSafetySettings _fromPrefs(SharedPreferences prefs) {
+    return ContentSafetySettings(
       adultVisibility: _decodeVisibility(prefs.getString(_adultVisibilityKey)),
       extremeVisibility: _decodeVisibility(
         prefs.getString(_extremeVisibilityKey),
       ),
+      isLoaded: true,
     );
   }
 
-  Future<void> setAdultVisibility(ContentVisibility visibility) async {
-    state = state.copyWith(adultVisibility: visibility);
-    final prefs = await _prefsFuture;
-    await prefs.setString(_adultVisibilityKey, visibility.name);
-  }
-
-  Future<void> setExtremeVisibility(ContentVisibility visibility) async {
-    state = state.copyWith(extremeVisibility: visibility);
-    final prefs = await _prefsFuture;
-    await prefs.setString(_extremeVisibilityKey, visibility.name);
-  }
-
-  ContentVisibility _decodeVisibility(String? value) {
+  static ContentVisibility _decodeVisibility(String? value) {
     if (value == null) {
       return ContentVisibility.blur;
     }
@@ -100,5 +100,24 @@ class ContentSafetySettingsNotifier
       (option) => option.name == value,
       orElse: () => ContentVisibility.blur,
     );
+  }
+
+  Future<void> _load() async {
+    final prefs = await _prefsFuture;
+    state = _cachedInitial = _fromPrefs(prefs);
+  }
+
+  Future<void> setAdultVisibility(ContentVisibility visibility) async {
+    state = state.copyWith(adultVisibility: visibility);
+    final prefs = await _prefsFuture;
+    await prefs.setString(_adultVisibilityKey, visibility.name);
+    _cachedInitial = _fromPrefs(prefs);
+  }
+
+  Future<void> setExtremeVisibility(ContentVisibility visibility) async {
+    state = state.copyWith(extremeVisibility: visibility);
+    final prefs = await _prefsFuture;
+    await prefs.setString(_extremeVisibilityKey, visibility.name);
+    _cachedInitial = _fromPrefs(prefs);
   }
 }
