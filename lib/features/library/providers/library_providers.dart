@@ -20,11 +20,10 @@ final libraryFavoritesProvider =
 
 class LibraryFavoritesController
     extends AsyncNotifier<List<LibraryFavoriteEntry>> {
-  late final LibraryStorage _storage;
+  LibraryStorage get _storage => ref.read(libraryStorageProvider);
 
   @override
   Future<List<LibraryFavoriteEntry>> build() async {
-    _storage = ref.watch(libraryStorageProvider);
     return _storage.loadFavorites();
   }
 
@@ -111,11 +110,10 @@ final libraryHistoryProvider =
 
 class LibraryHistoryController
     extends AsyncNotifier<List<LibraryHistoryEntry>> {
-  late final LibraryStorage _storage;
+  LibraryStorage get _storage => ref.read(libraryStorageProvider);
 
   @override
   Future<List<LibraryHistoryEntry>> build() async {
-    _storage = ref.watch(libraryStorageProvider);
     return _storage.loadHistory();
   }
 
