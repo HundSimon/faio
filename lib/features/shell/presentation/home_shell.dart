@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../feed/providers/feed_providers.dart';
 
 // Routes where an immersive experience is desirable (hide the bottom nav).
 final List<RegExp> _navHiddenRoutePatterns = [
@@ -42,7 +45,7 @@ class HomeShell extends StatelessWidget {
     final hideNavBar = _isNavHiddenRoute(currentState.uri.toString());
     final destinations = _navDestinations;
     return Scaffold(
-      body: navigationShell,
+      body: Stack(children: [navigationShell, const _FeedPreloader()]),
       bottomNavigationBar: hideNavBar
           ? null
           : Container(
@@ -75,6 +78,44 @@ class HomeShell extends StatelessWidget {
             ),
     );
   }
+}
+
+class _FeedPreloader extends ConsumerStatefulWidget {
+  const _FeedPreloader();
+
+  @override
+  ConsumerState<_FeedPreloader> createState() => _FeedPreloaderState();
+}
+
+class _FeedPreloaderState extends ConsumerState<_FeedPreloader> {
+  ProviderSubscription<FeedState>? _illustrationSubscription;
+  ProviderSubscription<FeedState>? _novelSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _illustrationSubscription ??= ref.listenManual<FeedState>(
+        illustrationFeedControllerProvider(IllustrationSource.mixed),
+        (_, __) {},
+      );
+      _novelSubscription ??= ref.listenManual<FeedState>(
+        pixivNovelFeedControllerProvider,
+        (_, __) {},
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _illustrationSubscription?.close();
+    _novelSubscription?.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class _NavDestinationData {
