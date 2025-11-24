@@ -909,6 +909,7 @@ class _NovelListItem extends ConsumerWidget {
           lowRes: lowRes,
           highRes: highRes,
           fit: BoxFit.cover,
+          showLowResImmediately: true,
         );
       }
 
