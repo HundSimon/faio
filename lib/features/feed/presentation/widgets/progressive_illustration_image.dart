@@ -14,6 +14,7 @@ class ProgressiveIllustrationImage extends StatefulWidget {
     this.highRes,
     this.fit = BoxFit.cover,
     this.onFirstFrameShown,
+    this.showLowResImmediately = false,
   });
 
   final FaioContent content;
@@ -21,6 +22,7 @@ class ProgressiveIllustrationImage extends StatefulWidget {
   final Uri? highRes;
   final BoxFit fit;
   final VoidCallback? onFirstFrameShown;
+  final bool showLowResImmediately;
 
   @override
   State<ProgressiveIllustrationImage> createState() =>
@@ -31,15 +33,27 @@ class _ProgressiveIllustrationImageState
     extends State<ProgressiveIllustrationImage> {
   static const _fadeDuration = Duration(milliseconds: 240);
 
-  bool _lowResVisible = false;
+  late bool _lowResVisible;
   bool _highResLoaded = false;
   bool _didNotifyFirstFrame = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lowResVisible = widget.showLowResImmediately && widget.lowRes != null;
+    if (_lowResVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _notifyFirstFrameIfNeeded();
+      });
+    }
+  }
 
   @override
   void didUpdateWidget(covariant ProgressiveIllustrationImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.lowRes?.toString() != oldWidget.lowRes?.toString()) {
-      _lowResVisible = false;
+      _lowResVisible = widget.showLowResImmediately && widget.lowRes != null;
     }
     if (widget.highRes?.toString() != oldWidget.highRes?.toString()) {
       _highResLoaded = false;
@@ -47,6 +61,15 @@ class _ProgressiveIllustrationImageState
     if (widget.lowRes != oldWidget.lowRes ||
         widget.highRes != oldWidget.highRes) {
       _didNotifyFirstFrame = false;
+    }
+    if (widget.showLowResImmediately &&
+        !_lowResVisible &&
+        widget.lowRes != null) {
+      _lowResVisible = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _notifyFirstFrameIfNeeded();
+      });
     }
   }
 

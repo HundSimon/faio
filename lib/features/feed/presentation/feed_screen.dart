@@ -1284,6 +1284,7 @@ class _ContentTileState extends State<_ContentTile> {
           lowRes: lowRes,
           highRes: highRes,
           fit: BoxFit.cover,
+          showLowResImmediately: true,
           onFirstFrameShown: () {
             if (_hasFirstFrame) return;
             setState(() => _hasFirstFrame = true);

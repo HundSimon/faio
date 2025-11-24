@@ -542,6 +542,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
         lowRes: lowRes,
         highRes: highRes,
         fit: BoxFit.cover,
+        showLowResImmediately: true,
       );
     }
 
@@ -567,115 +568,120 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
           onLongPress: () => _handleLongPressHero(context),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
-            child: AspectRatio(
-              aspectRatio: aspectRatio > 0 ? aspectRatio : 1,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (hasMultiple)
-                    PageView.builder(
-                      controller: _heroPageController,
-                      itemCount: heroImages.length,
-                      onPageChanged: (value) {
-                        if (_heroPageIndex != value) {
-                          setState(() {
-                            _heroPageIndex = value;
-                          });
-                        }
-                      },
-                      itemBuilder: (context, index) =>
-                          buildPage(heroImages[index]),
-                    )
-                  else
-                    buildPage(heroImages.first),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.45),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (hasMultiple)
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+              ),
+              child: AspectRatio(
+                aspectRatio: aspectRatio > 0 ? aspectRatio : 1,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (hasMultiple)
+                      PageView.builder(
+                        controller: _heroPageController,
+                        itemCount: heroImages.length,
+                        onPageChanged: (value) {
+                          if (_heroPageIndex != value) {
+                            setState(() {
+                              _heroPageIndex = value;
+                            });
+                          }
+                        },
+                        itemBuilder: (context, index) =>
+                            buildPage(heroImages[index]),
+                      )
+                    else
+                      buildPage(heroImages.first),
+                    Positioned.fill(
+                      child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.55),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '${_heroPageIndex + 1}/${heroImages.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.45),
+                              Colors.transparent,
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: FadeTransition(
-                        opacity: _burstOpacity,
-                        child: ScaleTransition(
-                          scale: _burstScale,
-                          child: const Icon(
-                            Icons.favorite,
-                            color: Colors.white,
-                            size: 96,
+                    if (hasMultiple)
+                      Positioned(
+                        bottom: 16,
+                        right: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.55),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '${_heroPageIndex + 1}/${heroImages.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: FadeTransition(
+                          opacity: _burstOpacity,
+                          child: ScaleTransition(
+                            scale: _burstScale,
+                            child: const Icon(
+                              Icons.favorite,
+                              color: Colors.white,
+                              size: 96,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  if (_isSavingImage)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                    if (_isSavingImage)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              '保存中…',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                              SizedBox(width: 8),
+                              Text(
+                                '保存中…',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1276,6 +1282,7 @@ class _ZoomableIllustrationPageState extends State<_ZoomableIllustrationPage> {
         lowRes: lowRes,
         highRes: highRes,
         fit: BoxFit.contain,
+        showLowResImmediately: true,
       ),
     );
   }
