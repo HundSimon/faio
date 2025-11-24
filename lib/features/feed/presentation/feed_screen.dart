@@ -153,12 +153,14 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
         final shouldScroll =
             source == IllustrationSource.mixed && targetIndex != null;
         if (shouldScroll) {
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _scrollToIndex(IllustrationSource.mixed, targetIndex);
-            final controller = ref.read(feedSelectionProvider.notifier);
-            controller.clearScrollRequest();
-            controller.clearSelection();
-          });
+          _scrollToIndex(
+            IllustrationSource.mixed,
+            targetIndex,
+            jumpToIndex: true,
+          );
+          final controller = ref.read(feedSelectionProvider.notifier);
+          controller.clearScrollRequest();
+          controller.clearSelection();
         }
       },
     );
@@ -208,7 +210,11 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     }
   }
 
-  Future<void> _scrollToIndex(IllustrationSource source, int index) async {
+  Future<void> _scrollToIndex(
+    IllustrationSource source,
+    int index, {
+    bool jumpToIndex = false,
+  }) async {
     if (source != IllustrationSource.mixed) {
       return;
     }
@@ -221,24 +227,30 @@ class _IllustrationTabState extends ConsumerState<_IllustrationTab>
     if (!_scrollController.hasClients) {
       return;
     }
-    Future<bool> ensureVisible() async {
+    Future<bool> ensureVisible({bool immediate = false}) async {
       final context = itemKeys[index]?.currentContext;
       if (context == null) {
         return false;
       }
       await Scrollable.ensureVisible(
         context,
-        duration: const Duration(milliseconds: 300),
+        duration: immediate ? Duration.zero : const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         alignment: 0.1,
       );
       return true;
     }
 
-    if (await ensureVisible()) {
+    if (await ensureVisible(immediate: jumpToIndex)) {
       return;
     }
     final offset = _calculateScrollOffset(_scrollController, index);
+    if (jumpToIndex) {
+      _scrollController.jumpTo(offset);
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      await ensureVisible(immediate: true);
+      return;
+    }
     await _scrollController.animateTo(
       offset,
       duration: const Duration(milliseconds: 300),
@@ -542,17 +554,17 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
     }
   }
 
-  Future<void> _scrollToIndex(int index) async {
+  Future<void> _scrollToIndex(int index, {bool jumpToIndex = false}) async {
     if (!_scrollController.hasClients) {
       return;
     }
 
-    Future<bool> ensureVisible() async {
+    Future<bool> ensureVisible({bool immediate = false}) async {
       final context = _itemKeys[index]?.currentContext;
       if (context != null) {
         await Scrollable.ensureVisible(
           context,
-          duration: const Duration(milliseconds: 320),
+          duration: immediate ? Duration.zero : const Duration(milliseconds: 320),
           curve: Curves.easeInOut,
           alignment: 0.1,
         );
@@ -561,7 +573,7 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
       return false;
     }
 
-    if (await ensureVisible()) {
+    if (await ensureVisible(immediate: jumpToIndex)) {
       return;
     }
 
@@ -572,6 +584,12 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
       position.minScrollExtent,
       position.maxScrollExtent,
     );
+    if (jumpToIndex) {
+      _scrollController.jumpTo(clamped);
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      await ensureVisible(immediate: true);
+      return;
+    }
     await _scrollController.animateTo(
       clamped,
       duration: const Duration(milliseconds: 320),
@@ -601,12 +619,10 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
       if (!mounted) return;
       final targetIndex = next.pendingScrollIndex;
       if (targetIndex != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await _scrollToIndex(targetIndex);
-          final controller = ref.read(novelFeedSelectionProvider.notifier);
-          controller.clearScrollRequest();
-          controller.clearSelection();
-        });
+        _scrollToIndex(targetIndex, jumpToIndex: true);
+        final controller = ref.read(novelFeedSelectionProvider.notifier);
+        controller.clearScrollRequest();
+        controller.clearSelection();
       }
     });
 

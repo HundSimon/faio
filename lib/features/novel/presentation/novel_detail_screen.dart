@@ -67,6 +67,7 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
   String? _lastRecordedContentId;
   PageController? _pageController;
   int? _currentIndex;
+  var _isPopping = false;
 
   @override
   void initState() {
@@ -145,6 +146,15 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
       return;
     }
     ref.read(novelFeedSelectionProvider.notifier).requestScrollTo(index);
+  }
+
+  Future<bool> _handleWillPop() async {
+    if (_isPopping) return true;
+    _isPopping = true;
+    _requestScrollBack();
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    _isPopping = false;
+    return true;
   }
 
   void _maybeAttachPagerFromFeed(List<FaioContent> items) {
@@ -234,10 +244,7 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
           );
 
     return WillPopScope(
-      onWillPop: () async {
-        _requestScrollBack();
-        return true;
-      },
+      onWillPop: _handleWillPop,
       child: Scaffold(
         appBar: AppBar(
           title: Text(

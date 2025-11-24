@@ -89,6 +89,7 @@ class _IllustrationDetailScreenState
   late int _currentIndex;
   String? _lastRecordedId;
   late final PageController _pageController;
+  var _isPopping = false;
 
   @override
   void initState() {
@@ -162,6 +163,16 @@ class _IllustrationDetailScreenState
     ref
         .read(feedSelectionProvider.notifier)
         .requestScrollTo(widget.source, _currentIndex);
+  }
+
+  Future<bool> _handleWillPop() async {
+    if (_isPopping) return true;
+    _isPopping = true;
+    _requestScrollBack();
+    // Give the feed a frame to jump to the target tile before the Hero starts.
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    _isPopping = false;
+    return true;
   }
 
   @override
@@ -259,15 +270,10 @@ class _IllustrationDetailScreenState
         : '作品详情';
 
     return WillPopScope(
-      onWillPop: () async {
-        _requestScrollBack();
-        return true;
-      },
+      onWillPop: _handleWillPop,
       child: Scaffold(
         appBar: AppBar(
-          leading: BackButton(
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
+          leading: const BackButton(),
           title: Text(
             currentTitle,
             maxLines: 1,
