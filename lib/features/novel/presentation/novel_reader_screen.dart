@@ -29,7 +29,7 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
   double _currentScrollRatio = 0;
   double _scrollThumbExtentRatio = 1;
   bool _hasScrollableContent = false;
-  List<String>? _cachedParagraphs;
+  List<_ReaderBlock>? _cachedBlocks;
   int? _cachedNovelId;
   String? _cachedBody;
   double? _cachedContentExtent;
@@ -169,8 +169,8 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
             final palette = _ReaderThemePreset.resolve(settings.themeId);
             final background = palette.background;
             final textColor = palette.textColor;
-            final paragraphs = _paragraphsFor(detail);
-            final contentCount = paragraphs.length + 1;
+            final blocks = _blocksFor(detail);
+            final contentCount = blocks.length + 1;
 
             return Scaffold(
               backgroundColor: background,
@@ -204,7 +204,7 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                       context: context,
                       detail: detail,
                       settings: settings,
-                      paragraphs: paragraphs,
+                      blocks: blocks,
                       maxWidth: contentWidth,
                     );
                     return Stack(
@@ -254,20 +254,28 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                                     );
                                   }
                                   final paragraphIndex = index - 1;
-                                  final paragraph = paragraphs[paragraphIndex];
+                                  final block = blocks[paragraphIndex];
+                                  final previous = paragraphIndex > 0
+                                      ? blocks[paragraphIndex - 1]
+                                      : null;
                                   return Padding(
                                     padding: EdgeInsets.only(
-                                      bottom: settings.paragraphSpacing,
+                                      top: _blockTopSpacing(
+                                        block,
+                                        previous,
+                                        settings,
+                                      ),
+                                      bottom: _blockBottomSpacing(
+                                        block,
+                                        settings,
+                                      ),
                                     ),
                                     child: Text(
-                                      paragraph,
-                                      style: TextStyle(
-                                        fontSize: settings.fontSize,
-                                        height: settings.lineHeight,
-                                        fontFamily: _fontFamilyFor(
-                                          settings.fontFamily,
-                                        ),
-                                        color: textColor,
+                                      block.text,
+                                      style: _textStyleForBlock(
+                                        block,
+                                        settings,
+                                        textColor,
                                       ),
                                     ),
                                   );
@@ -304,23 +312,23 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
     );
   }
 
-  List<String> _paragraphsFor(NovelDetail detail) {
+  List<_ReaderBlock> _blocksFor(NovelDetail detail) {
     final bodyChanged =
         _cachedNovelId != detail.novelId || _cachedBody != detail.body;
-    if (_cachedParagraphs == null || bodyChanged) {
-      _cachedParagraphs = _splitParagraphs(detail.body);
+    if (_cachedBlocks == null || bodyChanged) {
+      _cachedBlocks = _splitBlocks(detail.body);
       _cachedNovelId = detail.novelId;
       _cachedBody = detail.body;
       _invalidateLayoutMetrics();
     }
-    return _cachedParagraphs!;
+    return _cachedBlocks!;
   }
 
   void _ensureLayoutMetrics({
     required BuildContext context,
     required NovelDetail detail,
     required NovelReaderSettings settings,
-    required List<String> paragraphs,
+    required List<_ReaderBlock> blocks,
     required double maxWidth,
   }) {
     if (maxWidth.isInfinite || maxWidth <= 0) {
@@ -339,22 +347,24 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
 
     final theme = Theme.of(context);
     final textDirection = Directionality.of(context);
-    final paragraphStyle = TextStyle(
-      fontSize: settings.fontSize,
-      height: settings.lineHeight,
-      fontFamily: _fontFamilyFor(settings.fontFamily),
-    );
     final painter = TextPainter(
       textDirection: textDirection,
       textAlign: TextAlign.start,
     );
     double paragraphTotal = 0;
-    for (final paragraph in paragraphs) {
+    for (var i = 0; i < blocks.length; i++) {
+      final block = blocks[i];
+      final previous = i > 0 ? blocks[i - 1] : null;
       painter
-        ..text = TextSpan(text: paragraph, style: paragraphStyle)
+        ..text = TextSpan(
+          text: block.text,
+          style: _textStyleForBlock(block, settings),
+        )
         ..layout(maxWidth: maxWidth);
-      final height = painter.size.height + settings.paragraphSpacing;
-      paragraphTotal += height;
+      final blockHeight = painter.size.height;
+      final topSpacing = _blockTopSpacing(block, previous, settings);
+      final bottomSpacing = _blockBottomSpacing(block, settings);
+      paragraphTotal += blockHeight + topSpacing + bottomSpacing;
     }
 
     double headerHeight = 0;
@@ -896,7 +906,113 @@ String? _fontFamilyFor(String id) {
   }
 }
 
-List<String> _splitParagraphs(String text) {
+enum _ReaderBlockType { paragraph, chapter }
+
+class _ReaderBlock {
+  const _ReaderBlock._(this.text, this.type);
+
+  const _ReaderBlock.paragraph(String text)
+    : this._(text, _ReaderBlockType.paragraph);
+
+  const _ReaderBlock.chapter(String text)
+    : this._(text, _ReaderBlockType.chapter);
+
+  final String text;
+  final _ReaderBlockType type;
+
+  bool get isChapter => type == _ReaderBlockType.chapter;
+}
+
+TextStyle _textStyleForBlock(
+  _ReaderBlock block,
+  NovelReaderSettings settings, [
+  Color? textColor,
+]) {
+  return block.isChapter
+      ? _chapterTextStyle(settings, textColor)
+      : _paragraphTextStyle(settings, textColor);
+}
+
+TextStyle _paragraphTextStyle(
+  NovelReaderSettings settings, [
+  Color? textColor,
+]) {
+  return TextStyle(
+    fontSize: settings.fontSize,
+    height: settings.lineHeight,
+    fontFamily: _fontFamilyFor(settings.fontFamily),
+    color: textColor,
+  );
+}
+
+TextStyle _chapterTextStyle(NovelReaderSettings settings, [Color? textColor]) {
+  final chapterLineHeight = (settings.lineHeight * 0.95)
+      .clamp(1.2, 2.5)
+      .toDouble();
+  return TextStyle(
+    fontSize: settings.fontSize + 2,
+    height: chapterLineHeight,
+    fontFamily: _fontFamilyFor(settings.fontFamily),
+    fontWeight: FontWeight.w700,
+    color: textColor,
+  );
+}
+
+double _blockTopSpacing(
+  _ReaderBlock block,
+  _ReaderBlock? previous,
+  NovelReaderSettings settings,
+) {
+  if (previous != null && block.isChapter) {
+    return settings.paragraphSpacing * 0.5;
+  }
+  return 0;
+}
+
+double _blockBottomSpacing(_ReaderBlock block, NovelReaderSettings settings) {
+  if (block.isChapter) {
+    return settings.paragraphSpacing * 1.2;
+  }
+  return settings.paragraphSpacing;
+}
+
+List<_ReaderBlock> _splitBlocks(String text) {
+  final normalized = text.replaceAll('\r\n', '\n');
+  final blocks = <_ReaderBlock>[];
+  final chapterRegex = RegExp(r'\[chapter:([^\]\r\n]+)\]');
+  var lastIndex = 0;
+
+  void addParagraphs(String segment) {
+    final trimmed = segment.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    blocks.addAll(_paragraphBlocksFrom(segment));
+  }
+
+  for (final match in chapterRegex.allMatches(normalized)) {
+    if (match.start > lastIndex) {
+      addParagraphs(normalized.substring(lastIndex, match.start));
+    }
+    final title = match.group(1)?.trim();
+    if (title != null && title.isNotEmpty) {
+      blocks.add(_ReaderBlock.chapter(title));
+    }
+    lastIndex = match.end;
+  }
+
+  if (lastIndex < normalized.length) {
+    addParagraphs(normalized.substring(lastIndex));
+  }
+
+  if (blocks.isEmpty) {
+    addParagraphs(normalized);
+  }
+
+  return blocks;
+}
+
+List<_ReaderBlock> _paragraphBlocksFrom(String text) {
   final normalized = text.replaceAll('\r\n', '\n');
   final paragraphs = normalized
       .split(RegExp(r'\n{2,}'))
@@ -904,7 +1020,7 @@ List<String> _splitParagraphs(String text) {
       .where((block) => block.isNotEmpty)
       .toList();
   if (paragraphs.isNotEmpty) {
-    return paragraphs;
+    return paragraphs.map(_ReaderBlock.paragraph).toList();
   }
   final fallback = normalized
       .split('\n')
@@ -912,7 +1028,8 @@ List<String> _splitParagraphs(String text) {
       .where((line) => line.isNotEmpty)
       .toList();
   if (fallback.isNotEmpty) {
-    return fallback;
+    return fallback.map(_ReaderBlock.paragraph).toList();
   }
-  return [normalized.trim()];
+  final trimmed = normalized.trim();
+  return trimmed.isEmpty ? const [] : [_ReaderBlock.paragraph(trimmed)];
 }
