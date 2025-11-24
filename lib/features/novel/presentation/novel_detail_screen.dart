@@ -51,6 +51,7 @@ class NovelDetailScreen extends ConsumerStatefulWidget {
     this.initialContent,
     this.initialIndex,
     this.skipInitialWarningPrompt = false,
+    this.enableFeedPager = true,
     super.key,
   });
 
@@ -58,6 +59,7 @@ class NovelDetailScreen extends ConsumerStatefulWidget {
   final FaioContent? initialContent;
   final int? initialIndex;
   final bool skipInitialWarningPrompt;
+  final bool enableFeedPager;
 
   @override
   ConsumerState<NovelDetailScreen> createState() => _NovelDetailScreenState();
@@ -73,7 +75,7 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
   void initState() {
     super.initState();
     final initialIndex = widget.initialIndex;
-    if (initialIndex != null) {
+    if (initialIndex != null && widget.enableFeedPager) {
       _setPagerIndex(initialIndex);
     }
   }
@@ -141,6 +143,7 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
   }
 
   void _requestScrollBack() {
+    if (!widget.enableFeedPager) return;
     final index = _currentIndex;
     if (index == null) {
       return;
@@ -158,7 +161,7 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
   }
 
   void _maybeAttachPagerFromFeed(List<FaioContent> items) {
-    if (_pageController != null || items.isEmpty) {
+    if (!widget.enableFeedPager || _pageController != null || items.isEmpty) {
       return;
     }
     final targetIndex = _findIndexForCurrent(items);
@@ -193,6 +196,30 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.enableFeedPager) {
+      final titleAsync = ref.watch(novelDetailProvider(widget.novelId));
+      final fallbackTitle = widget.initialContent?.title ?? '小说详情';
+      final currentTitle = titleAsync.maybeWhen(
+        data: (detail) => detail.title,
+        orElse: () => fallbackTitle,
+      );
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            currentTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        body: _NovelDetailPage(
+          novelId: widget.novelId,
+          initialContent: widget.initialContent,
+          onRecordHistory: _recordHistory,
+          skipWarningPrompt: widget.skipInitialWarningPrompt,
+        ),
+      );
+    }
+
     ref.listen<NovelFeedSelectionState>(novelFeedSelectionProvider, (
       previous,
       next,
@@ -1070,8 +1097,7 @@ String _normalizeNovelSummary(String input) {
     (match) => _decodeHtmlEntity(match.group(0)!),
   );
   normalized = normalized.replaceAll(RegExp(r'\n{3,}'), '\n\n');
-  final lines =
-      normalized.split('\n').map((line) => line.trimRight()).toList();
+  final lines = normalized.split('\n').map((line) => line.trimRight()).toList();
   return lines.join('\n').trim();
 }
 

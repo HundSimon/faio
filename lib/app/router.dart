@@ -21,6 +21,8 @@ abstract final class AppRoute {
   static const feedNovelReader = 'feed_novel_reader';
   static const search = '/search';
   static const library = '/library';
+  static const libraryFavorites = 'library_favorites';
+  static const libraryHistory = 'library_history';
   static const settings = '/settings';
 }
 
@@ -179,6 +181,18 @@ final appRouterProvider = Provider<GoRouter>(
                 path: AppRoute.library,
                 name: AppRoute.library,
                 builder: (context, state) => const LibraryScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'favorites',
+                    name: AppRoute.libraryFavorites,
+                    builder: (context, state) => const LibraryFavoritesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'history',
+                    name: AppRoute.libraryHistory,
+                    builder: (context, state) => const LibraryHistoryScreen(),
+                  ),
+                ],
               ),
             ],
           ),

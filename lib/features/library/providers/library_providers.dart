@@ -100,6 +100,17 @@ class LibraryFavoritesController
       (entry) => entry.isSeries && entry.series!.seriesId == seriesId,
     );
   }
+
+  Future<void> removeByKeys(Iterable<String> keys) async {
+    final keySet = keys.toSet();
+    if (keySet.isEmpty) {
+      return;
+    }
+    final current = await _current();
+    final next = current.where((entry) => !keySet.contains(entry.key)).toList();
+    state = AsyncValue.data(next);
+    await _storage.saveFavorites(next);
+  }
 }
 
 final libraryHistoryProvider =
@@ -147,5 +158,16 @@ class LibraryHistoryController
   Future<void> clearHistory() async {
     state = const AsyncValue.data([]);
     await _storage.saveHistory(const []);
+  }
+
+  Future<void> removeByKeys(Iterable<String> keys) async {
+    final keySet = keys.toSet();
+    if (keySet.isEmpty) {
+      return;
+    }
+    final current = await _current();
+    final next = current.where((entry) => !keySet.contains(entry.key)).toList();
+    state = AsyncValue.data(next);
+    await _storage.saveHistory(next);
   }
 }
