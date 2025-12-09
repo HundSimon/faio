@@ -8,10 +8,14 @@ plugins {
 }
 
 val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
-val hasCustomSigning = keystorePropertiesFile.exists().also { exists ->
+val keystorePropertiesFileCandidates = listOf(
+    rootProject.file("key.properties"),
+    rootProject.file("android/key.properties"),
+)
+val keystorePropertiesFile = keystorePropertiesFileCandidates.firstOrNull { it.exists() }
+val hasCustomSigning = (keystorePropertiesFile != null).also { exists ->
     if (exists) {
-        keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+        keystorePropertiesFile!!.inputStream().use { keystoreProperties.load(it) }
     }
 }
 
@@ -60,6 +64,11 @@ android {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
+            }
+        }
+        getByName("debug") {
+            if (hasCustomSigning) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }
