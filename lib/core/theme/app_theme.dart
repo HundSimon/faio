@@ -18,6 +18,7 @@ abstract final class AppTheme {
         seedColor: _seed,
         brightness: brightness,
       ),
+      fontFamily: 'SourceHanSans',
       useMaterial3: true,
       visualDensity: VisualDensity.adaptivePlatformDensity,
       appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
