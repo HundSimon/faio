@@ -93,6 +93,41 @@ final novelReadingProgressProvider =
       return storage.loadProgress(novelId);
     }, name: 'novelReadingProgressProvider');
 
+final lastReadNovelInSeriesProvider =
+    AutoDisposeFutureProvider.family<int?, int>((ref, seriesId) async {
+      final series = await ref.watch(
+        novelSeriesDetailProvider(seriesId).future,
+      );
+      if (series == null || series.novels.isEmpty) {
+        return null;
+      }
+      final storage = ref.watch(novelReadingStorageProvider);
+      final ids = series.novels.map((entry) => entry.id).where((id) => id > 0);
+
+      NovelReadingProgress? best;
+      final batch = <Future<NovelReadingProgress?>>[];
+      Future<void> flush() async {
+        if (batch.isEmpty) return;
+        final resolved = await Future.wait(batch);
+        batch.clear();
+        for (final progress in resolved) {
+          if (progress == null) continue;
+          if (best == null || progress.updatedAt.isAfter(best!.updatedAt)) {
+            best = progress;
+          }
+        }
+      }
+
+      for (final id in ids) {
+        batch.add(storage.loadProgress(id));
+        if (batch.length >= 20) {
+          await flush();
+        }
+      }
+      await flush();
+      return best?.novelId;
+    }, name: 'lastReadNovelInSeriesProvider');
+
 final novelReaderSettingsProvider =
     StateNotifierProvider<
       NovelReaderSettingsController,

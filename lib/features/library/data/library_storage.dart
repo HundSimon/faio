@@ -262,6 +262,9 @@ Map<String, dynamic> _encodeSeries(LibrarySeriesFavorite series) {
     'title': series.title,
     'caption': series.caption,
     'coverUrl': series.coverUrl?.toString(),
+    'source': series.source,
+    'authorName': series.authorName,
+    'authorId': series.authorId,
   };
 }
 
@@ -279,6 +282,11 @@ LibrarySeriesFavorite? _decodeSeries(Map<String, dynamic>? json) {
     title: title,
     caption: json['caption'] as String?,
     coverUrl: _tryParseUri(json['coverUrl'] as String?),
+    source: json['source'] as String?,
+    authorName: json['authorName'] as String?,
+    authorId: json['authorId'] is num
+        ? (json['authorId'] as num).toInt()
+        : null,
   );
 }
 

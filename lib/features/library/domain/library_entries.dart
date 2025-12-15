@@ -22,17 +22,31 @@ class LibrarySeriesFavorite extends Equatable {
     required this.title,
     this.caption,
     this.coverUrl,
+    this.source,
+    this.authorName,
+    this.authorId,
   });
 
   final int seriesId;
   final String title;
   final String? caption;
   final Uri? coverUrl;
+  final String? source;
+  final String? authorName;
+  final int? authorId;
 
   String get key => 'series:$seriesId';
 
   @override
-  List<Object?> get props => [seriesId, title, caption, coverUrl];
+  List<Object?> get props => [
+    seriesId,
+    title,
+    caption,
+    coverUrl,
+    source,
+    authorName,
+    authorId,
+  ];
 }
 
 class LibraryFavoriteEntry extends Equatable {

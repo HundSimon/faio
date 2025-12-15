@@ -31,7 +31,6 @@ import 'package:faio/features/library/presentation/widgets/favorite_icon_button.
 import 'package:faio/features/novel/presentation/novel_hero.dart';
 
 import '../providers/novel_providers.dart';
-import 'widgets/novel_series_sheet.dart';
 
 class NovelDetailRouteExtra {
   const NovelDetailRouteExtra({
@@ -1012,6 +1011,9 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
             _NovelSeriesPreview(
               series: detail.series!,
               currentNovelId: novelId,
+              source: detail.source,
+              authorName: detail.authorName,
+              authorId: detail.authorId,
             ),
           ],
           if (timelineCard != null) ...[
@@ -1056,16 +1058,9 @@ Future<void> _openNovelChapterSelector(
   NovelSeriesOutline series,
   int currentNovelId,
 ) async {
-  final selected = await showNovelSeriesSheet(
-    context: context,
-    seriesId: series.id,
-    currentNovelId: currentNovelId,
+  context.push(
+    '/feed/novel-series/${series.id}?currentNovelId=$currentNovelId&replace=1',
   );
-  if (selected == null || selected == currentNovelId) {
-    return;
-  }
-  if (!context.mounted) return;
-  context.pushReplacement('/feed/novel/$selected');
 }
 
 String _normalizeNovelSummary(String input) {
@@ -1423,31 +1418,42 @@ class _NovelSeriesPreview extends ConsumerWidget {
   const _NovelSeriesPreview({
     required this.series,
     required this.currentNovelId,
+    required this.source,
+    required this.authorName,
+    required this.authorId,
   });
 
   final NovelSeriesOutline series;
   final int currentNovelId;
+  final String source;
+  final String? authorName;
+  final int? authorId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final seriesAsync = ref.watch(novelSeriesDetailProvider(series.id));
+    final seriesDetail = seriesAsync.valueOrNull;
     final seriesFavorite = LibrarySeriesFavorite(
       seriesId: series.id,
-      title: series.title.isNotEmpty ? series.title : '未知合集',
+      title: (seriesDetail?.title ?? series.title).trim().isNotEmpty
+          ? (seriesDetail?.title ?? series.title).trim()
+          : '未知合集',
+      caption: seriesDetail?.caption.trim().isNotEmpty == true
+          ? seriesDetail?.caption.trim()
+          : null,
+      coverUrl: seriesDetail?.novels.isNotEmpty == true
+          ? seriesDetail!.novels.first.coverUrl
+          : null,
+      source: source,
+      authorName: authorName,
+      authorId: authorId,
     );
 
     Future<void> openSelector() async {
-      final selected = await showNovelSeriesSheet(
-        context: context,
-        seriesId: series.id,
-        currentNovelId: currentNovelId,
+      context.push(
+        '/feed/novel-series/${series.id}?currentNovelId=$currentNovelId&replace=1',
       );
-      if (selected == null || selected == currentNovelId) {
-        return;
-      }
-      if (!context.mounted) return;
-      context.pushReplacement('/feed/novel/$selected');
     }
 
     return DetailSectionCard(

@@ -8,6 +8,7 @@ import '../features/feed/presentation/illustration_detail_screen.dart';
 import '../features/feed/providers/feed_providers.dart' show IllustrationSource;
 import '../features/library/presentation/library_screen.dart';
 import '../features/novel/presentation/novel_detail_screen.dart';
+import '../features/novel/presentation/novel_series_detail_screen.dart';
 import '../features/novel/presentation/novel_reader_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
@@ -19,6 +20,7 @@ abstract final class AppRoute {
   static const feedDetail = 'feed_detail';
   static const feedNovelDetail = 'feed_novel_detail';
   static const feedNovelReader = 'feed_novel_reader';
+  static const feedNovelSeriesDetail = 'feed_novel_series_detail';
   static const search = '/search';
   static const library = '/library';
   static const libraryFavorites = 'library_favorites';
@@ -161,6 +163,41 @@ final appRouterProvider = Provider<GoRouter>(
                         },
                       ),
                     ],
+                  ),
+                  GoRoute(
+                    path: 'novel-series/:seriesId',
+                    name: AppRoute.feedNovelSeriesDetail,
+                    pageBuilder: (context, state) {
+                      final seriesIdParam = state.pathParameters['seriesId'];
+                      final seriesId = seriesIdParam != null
+                          ? int.tryParse(seriesIdParam)
+                          : null;
+                      if (seriesId == null) {
+                        return CustomTransitionPage<void>(
+                          key: state.pageKey,
+                          child: const _RouteErrorScreen(),
+                          transitionsBuilder: _detailPageTransitionBuilder,
+                        );
+                      }
+
+                      final currentNovelIdParam =
+                          state.uri.queryParameters['currentNovelId'];
+                      final currentNovelId = currentNovelIdParam != null
+                          ? int.tryParse(currentNovelIdParam)
+                          : null;
+                      final replaceOnSelect =
+                          state.uri.queryParameters['replace'] == '1';
+
+                      return CustomTransitionPage<void>(
+                        key: state.pageKey,
+                        child: NovelSeriesDetailScreen(
+                          seriesId: seriesId,
+                          currentNovelId: currentNovelId,
+                          replaceOnSelect: replaceOnSelect,
+                        ),
+                        transitionsBuilder: _detailPageTransitionBuilder,
+                      );
+                    },
                   ),
                 ],
               ),
