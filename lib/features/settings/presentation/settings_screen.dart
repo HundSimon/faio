@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/preferences/content_safety_settings.dart';
+import '../../../core/preferences/sample_mode_settings.dart';
 import '../../../integrations/e621/e621_auth.dart';
 import '../../../integrations/pixiv/pixiv_auth.dart';
 import '../../../integrations/pixiv/pixiv_providers.dart';
@@ -21,6 +22,7 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final theme = Theme.of(context);
     final contentSafety = ref.watch(contentSafetySettingsProvider);
+    final sampleMode = ref.watch(sampleModeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -81,6 +83,16 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Card(
+            child: SwitchListTile(
+              title: const Text('示例数据模式'),
+              subtitle: const Text('用于离线/调试，使用内置示例数据代替真实请求'),
+              value: sampleMode,
+              onChanged: (value) =>
+                  ref.read(sampleModeProvider.notifier).setEnabled(value),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
             child: ListTile(
               title: const Text('e621 凭证'),
               subtitle: Text(
@@ -103,7 +115,9 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   Text(
                     pixivCredentials == null
-                        ? '未配置，将使用示例内容'
+                        ? sampleMode
+                              ? '未配置，示例数据模式已开启'
+                              : '未配置，将使用示例内容'
                         : '刷新令牌已配置，访问令牌到期：${_formatExpiry(pixivCredentials.expiresAt)}',
                   ),
                   const SizedBox(height: 12),

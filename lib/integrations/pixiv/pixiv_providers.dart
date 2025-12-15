@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rhttp/rhttp.dart';
 
 import '../../core/network/rate_limiter.dart';
+import '../../core/preferences/sample_mode_settings.dart';
 import '../../core/tagging/tag_preferences_provider.dart';
 import '../../domain/repositories/pixiv_repository.dart';
 import '../furrynovel/furrynovel_providers.dart';
@@ -10,7 +11,6 @@ import 'pixiv_app_version.dart';
 import 'pixiv_auth.dart';
 import 'pixiv_auth_flow.dart';
 import 'pixiv_dns_resolver.dart';
-import 'pixiv_fallback_service.dart';
 import 'pixiv_http_service.dart';
 import 'pixiv_mock_service.dart';
 import 'pixiv_oauth_client.dart';
@@ -68,9 +68,17 @@ final pixivHttpServiceProvider = Provider<PixivService>((ref) {
 }, name: 'pixivHttpServiceProvider');
 
 final pixivServiceProvider = Provider<PixivService>((ref) {
-  final primary = ref.watch(pixivHttpServiceProvider);
-  final fallback = ref.watch(pixivMockServiceProvider);
-  return PixivFallbackService(primary: primary, fallback: fallback);
+  final sampleMode = ref.watch(sampleModeProvider);
+  if (sampleMode) {
+    return ref.watch(pixivMockServiceProvider);
+  }
+
+  final credentials = ref.watch(pixivAuthProvider);
+  if (credentials == null || !credentials.isValid) {
+    return ref.watch(pixivMockServiceProvider);
+  }
+
+  return ref.watch(pixivHttpServiceProvider);
 }, name: 'pixivServiceProvider');
 
 final pixivRepositoryProvider = Provider<PixivRepository>((ref) {

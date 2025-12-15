@@ -2,7 +2,7 @@ import 'e621_service.dart';
 import 'models/e621_post.dart';
 
 /// Wraps two services and falls back to the secondary one when the primary
-/// fails or returns empty results.
+/// fails.
 class E621FallbackService implements E621Service {
   E621FallbackService({
     required E621Service primary,
@@ -42,12 +42,9 @@ class E621FallbackService implements E621Service {
     Future<List<E621Post>> Function() fallback,
   ) async {
     try {
-      final result = await primary();
-      if (result.isNotEmpty) {
-        return result;
-      }
+      return await primary();
     } catch (_) {
-      // swallow and fallback
+      // Swallow and fallback (development-only).
     }
     return fallback();
   }

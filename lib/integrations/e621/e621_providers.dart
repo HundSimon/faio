@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/network_client.dart';
 import '../../core/network/rate_limiter.dart';
+import '../../core/preferences/sample_mode_settings.dart';
 import 'e621_auth.dart';
 import 'e621_fallback_service.dart';
 import 'e621_http_service.dart';
@@ -24,7 +25,11 @@ final e621HttpServiceProvider = Provider<E621Service>((ref) {
 }, name: 'e621HttpServiceProvider');
 
 final e621ServiceProvider = Provider<E621Service>((ref) {
+  final sampleMode = ref.watch(sampleModeProvider);
   final primary = ref.watch(e621HttpServiceProvider);
+  if (!sampleMode) {
+    return primary;
+  }
   final fallback = ref.watch(e621MockServiceProvider);
   return E621FallbackService(primary: primary, fallback: fallback);
 }, name: 'e621ServiceProvider');
