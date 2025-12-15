@@ -109,27 +109,37 @@ class _SeriesSheetBody extends StatelessWidget {
               itemBuilder: (context, index) {
                 final entry = entries[index];
                 final isCurrent = entry.id == currentNovelId;
+                final highlightColor = theme.colorScheme.primary.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.14 : 0.08,
+                );
                 return Card(
-                  color: isCurrent
-                      ? theme.colorScheme.primary.withOpacity(0.08)
-                      : null,
+                  color: isCurrent ? highlightColor : null,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: isCurrent
+                        ? BorderSide(color: theme.colorScheme.primary)
+                        : BorderSide.none,
+                  ),
                   child: ListTile(
                     leading: _SeriesCover(coverUrl: entry.coverUrl),
                     title: Text(
                       entry.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: isCurrent
-                        ? Text(
-                            '当前章节',
-                            style: theme.textTheme.labelMedium?.copyWith(
+                      style: isCurrent
+                          ? theme.textTheme.titleMedium?.copyWith(
                               color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
+                              fontWeight: FontWeight.w700,
+                            )
+                          : null,
+                    ),
+                    selected: isCurrent,
+                    trailing: isCurrent
+                        ? Icon(
+                            Icons.check_circle,
+                            color: theme.colorScheme.primary,
                           )
-                        : null,
-                    trailing: const Icon(Icons.chevron_right),
+                        : const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).pop(entry.id),
                   ),
                 );
