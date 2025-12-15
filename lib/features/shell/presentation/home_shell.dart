@@ -9,6 +9,7 @@ final List<RegExp> _navHiddenRoutePatterns = [
   RegExp(r'^/feed/detail$'),
   RegExp(r'^/feed/novel/\d+$'),
   RegExp(r'^/feed/novel/\d+/reader$'),
+  RegExp(r'^/feed/novel-series/\d+$'),
 ];
 
 bool _isNavHiddenRoute(String location) {
