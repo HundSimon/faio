@@ -35,8 +35,9 @@ Pixiv 的图片 CDN 需要 `Referer: https://app-api.pixiv.net/` 头；客户端
 
 ## 目录结构
 
-- `lib/data/e621`：e621 网络层、凭证管理
-- `lib/data/pixiv`：Pixiv OAuth、网络层、mock/fallback 服务
+- `lib/integrations/e621`：e621 网络层、凭证管理
+- `lib/integrations/pixiv`：Pixiv OAuth、网络层、mock/fallback 服务
+- `lib/integrations/furrynovel`：FurryNovel API 代理服务
 - `lib/data/library`：收藏/历史等本地存储
 - `lib/data/novel`：阅读进度/阅读器设置存储
 - `lib/domain`：跨 feature 的领域模型与工具方法

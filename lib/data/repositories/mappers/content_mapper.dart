@@ -1,9 +1,9 @@
 import '../../../domain/models/content_item.dart';
 import '../../../domain/models/content_tag.dart';
 import '../../../domain/utils/content_tag_builder.dart';
-import '../../e621/models/e621_post.dart';
-import '../../furrynovel/models/furry_novel_models.dart';
-import '../../pixiv/models/pixiv_models.dart';
+import '../../../integrations/e621/models/e621_post.dart';
+import '../../../integrations/furrynovel/models/furry_novel_models.dart';
+import '../../../integrations/pixiv/models/pixiv_models.dart';
 
 class ContentMapper {
   const ContentMapper._();

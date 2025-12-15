@@ -4,7 +4,7 @@ import 'package:faio/data/library/library_storage.dart';
 import 'package:faio/domain/models/library_entries.dart';
 
 import '../../../core/providers/shared_preferences_provider.dart';
-import '../../../data/pixiv/pixiv_providers.dart';
+import '../../../integrations/pixiv/pixiv_providers.dart';
 import '../../../domain/models/content_item.dart';
 import '../../../domain/repositories/pixiv_repository.dart';
 

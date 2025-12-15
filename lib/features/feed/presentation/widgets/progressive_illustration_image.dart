@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-import 'package:faio/data/pixiv/pixiv_image_cache.dart';
+import 'package:faio/integrations/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 

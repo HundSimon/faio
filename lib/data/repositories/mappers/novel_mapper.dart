@@ -1,8 +1,8 @@
 import '../../../domain/models/content_tag.dart';
 import '../../../domain/models/novel_detail.dart';
 import '../../../domain/utils/content_tag_builder.dart';
-import '../../furrynovel/models/furry_novel_models.dart';
-import '../../pixiv/models/pixiv_models.dart';
+import '../../../integrations/furrynovel/models/furry_novel_models.dart';
+import '../../../integrations/pixiv/models/pixiv_models.dart';
 
 class NovelMapper {
   static NovelDetail? fromFurryNovel(

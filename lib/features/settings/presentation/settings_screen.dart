@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/preferences/content_safety_settings.dart';
-import '../../../data/e621/e621_auth.dart';
-import '../../../data/pixiv/pixiv_auth.dart';
-import '../../../data/pixiv/pixiv_providers.dart';
+import '../../../integrations/e621/e621_auth.dart';
+import '../../../integrations/pixiv/pixiv_auth.dart';
+import '../../../integrations/pixiv/pixiv_providers.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import 'licenses_screen.dart';
 import 'pixiv_login_screen.dart';

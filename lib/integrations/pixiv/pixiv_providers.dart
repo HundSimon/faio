@@ -5,7 +5,7 @@ import '../../core/network/rate_limiter.dart';
 import '../../core/tagging/tag_preferences_provider.dart';
 import '../../domain/repositories/pixiv_repository.dart';
 import '../furrynovel/furrynovel_providers.dart';
-import '../repositories/pixiv_repository_impl.dart';
+import '../../data/repositories/pixiv_repository_impl.dart';
 import 'pixiv_app_version.dart';
 import 'pixiv_auth.dart';
 import 'pixiv_auth_flow.dart';

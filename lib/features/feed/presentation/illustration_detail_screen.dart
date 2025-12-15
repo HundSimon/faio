@@ -10,7 +10,7 @@ import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:faio/core/preferences/content_safety_settings.dart';
-import 'package:faio/data/pixiv/pixiv_image_cache.dart';
+import 'package:faio/integrations/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/utils/content_warning.dart';

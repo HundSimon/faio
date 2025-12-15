@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:faio/data/pixiv/pixiv_image_cache.dart';
+import 'package:faio/integrations/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/utils/content_id.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';

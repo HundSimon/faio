@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:faio/data/pixiv/pixiv_image_cache.dart';
+import 'package:faio/integrations/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/models/content_item.dart';
 import 'package:faio/domain/models/content_tag.dart';
 import 'package:faio/domain/models/novel_detail.dart';

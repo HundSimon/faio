@@ -3,10 +3,10 @@ import '../../domain/models/content_page.dart';
 import '../../domain/models/novel_detail.dart';
 import '../../domain/repositories/pixiv_repository.dart';
 import '../../domain/services/tag_filter.dart';
-import '../furrynovel/furrynovel_service.dart';
-import '../furrynovel/models/furry_novel_models.dart';
-import '../pixiv/models/pixiv_models.dart';
-import '../pixiv/pixiv_service.dart';
+import '../../integrations/furrynovel/furrynovel_service.dart';
+import '../../integrations/furrynovel/models/furry_novel_models.dart';
+import '../../integrations/pixiv/models/pixiv_models.dart';
+import '../../integrations/pixiv/pixiv_service.dart';
 import 'mappers/content_mapper.dart';
 import 'mappers/novel_mapper.dart';
 

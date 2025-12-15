@@ -3,8 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../data/e621/e621_providers.dart';
-import '../../../data/pixiv/pixiv_providers.dart';
+import '../../../integrations/e621/e621_providers.dart';
+import '../../../integrations/pixiv/pixiv_providers.dart';
 import '../../../data/repositories/mappers/content_mapper.dart';
 import '../../../data/repositories/content_repository_impl.dart';
 import '../../../domain/models/content_item.dart';

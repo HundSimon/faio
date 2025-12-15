@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-import '../../../data/pixiv/pixiv_auth.dart';
-import '../../../data/pixiv/pixiv_auth_flow.dart';
-import '../../../data/pixiv/pixiv_providers.dart';
+import '../../../integrations/pixiv/pixiv_auth.dart';
+import '../../../integrations/pixiv/pixiv_auth_flow.dart';
+import '../../../integrations/pixiv/pixiv_providers.dart';
 
 class PixivLoginScreen extends ConsumerStatefulWidget {
   const PixivLoginScreen({super.key});
