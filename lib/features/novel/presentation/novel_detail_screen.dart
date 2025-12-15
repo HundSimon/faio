@@ -507,7 +507,6 @@ class _NovelDetailError extends StatelessWidget {
 
 class _NovelDetailContent extends ConsumerStatefulWidget {
   const _NovelDetailContent({
-    super.key,
     required this.detail,
     required this.initialContent,
     required this.novelId,
@@ -1585,22 +1584,19 @@ String _formatCompactNumber(int value) {
 }
 
 class _InfoPill extends StatelessWidget {
-  const _InfoPill({required this.icon, required this.label, this.background});
+  const _InfoPill({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
-  final Color? background;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color:
-            background ??
-            theme.colorScheme.surfaceContainerHighest.withOpacity(
-              theme.brightness == Brightness.dark ? 0.7 : 0.9,
-            ),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(
+          theme.brightness == Brightness.dark ? 0.7 : 0.9,
+        ),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(

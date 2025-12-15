@@ -113,7 +113,7 @@ class _LibraryFavoritesScreenState
 
   Future<void> _refresh() async {
     _clearSelection();
-    await ref.refresh(libraryFavoritesProvider.future);
+    final _ = await ref.refresh(libraryFavoritesProvider.future);
   }
 
   void _toggleSelection(String key) {
@@ -367,7 +367,7 @@ class _LibraryHistoryScreenState extends ConsumerState<LibraryHistoryScreen> {
 
   Future<void> _refresh() async {
     _clearSelection();
-    await ref.refresh(libraryHistoryProvider.future);
+    final _ = await ref.refresh(libraryHistoryProvider.future);
   }
 
   void _toggleSelection(String key) {
