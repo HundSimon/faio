@@ -621,8 +621,8 @@ class _LibraryContentTile extends StatelessWidget {
               : '暂无简介');
 
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(
-        theme.brightness == Brightness.dark ? 0.35 : 0.5,
+      color: theme.colorScheme.surfaceContainerHighest.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.35 : 0.5,
       ),
       borderRadius: BorderRadius.circular(16),
       child: Stack(
@@ -724,8 +724,8 @@ class _LibrarySeriesTile extends StatelessWidget {
         ? series.caption!.trim()
         : '暂无简介';
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(
-        theme.brightness == Brightness.dark ? 0.35 : 0.5,
+      color: theme.colorScheme.surfaceContainerHighest.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.35 : 0.5,
       ),
       borderRadius: BorderRadius.circular(16),
       child: Stack(
@@ -813,8 +813,8 @@ class _LibraryNavCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final surface = theme.colorScheme.surfaceContainerHighest.withOpacity(
-      theme.brightness == Brightness.dark ? 0.32 : 0.5,
+    final surface = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: theme.brightness == Brightness.dark ? 0.32 : 0.5,
     );
     final items = previewItems.take(6).toList();
     return Material(
@@ -1029,8 +1029,8 @@ class _ViewMoreTile extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(
-                    theme.brightness == Brightness.dark ? 0.24 : 0.4,
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: theme.brightness == Brightness.dark ? 0.24 : 0.4,
                   ),
                 ),
                 padding: const EdgeInsets.all(10),
@@ -1180,7 +1180,7 @@ class _SelectionBar extends StatelessWidget {
           color: theme.colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: theme.colorScheme.shadow.withOpacity(0.06),
+              color: theme.colorScheme.shadow.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, -2),
             ),
@@ -1300,8 +1300,8 @@ class _EmptyHint extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(
-          theme.brightness == Brightness.dark ? 0.24 : 0.4,
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.24 : 0.4,
         ),
       ),
       alignment: Alignment.center,
@@ -1636,6 +1636,7 @@ Future<void> _openSeries(
 
 Future<void> _launchExternal(BuildContext context, Uri url) async {
   if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+    if (!context.mounted) return;
     ScaffoldMessenger.maybeOf(
       context,
     )?.showSnackBar(SnackBar(content: Text('无法打开链接：${url.toString()}')));

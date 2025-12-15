@@ -73,10 +73,11 @@ class _IllustrationGalleryScreenState
     final items = feedState.items;
     final itemCount = feedState.hasMore ? items.length + 1 : items.length;
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         Navigator.of(context, rootNavigator: true).pop(_currentIndex);
-        return false;
       },
       child: Scaffold(
         backgroundColor: Colors.black,

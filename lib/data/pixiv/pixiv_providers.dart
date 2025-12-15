@@ -76,11 +76,10 @@ final pixivServiceProvider = Provider<PixivService>((ref) {
 final pixivRepositoryProvider = Provider<PixivRepository>((ref) {
   final service = ref.watch(pixivServiceProvider);
   final furryNovelService = ref.watch(furryNovelServiceProvider);
-  final tagFilterResolver = () => ref.read(tagFilterProvider);
   return PixivRepositoryImpl(
     service: service,
     furryNovelService: furryNovelService,
-    tagFilterResolver: tagFilterResolver,
+    tagFilterResolver: () => ref.read(tagFilterProvider),
   );
 }, name: 'pixivRepositoryProvider');
 

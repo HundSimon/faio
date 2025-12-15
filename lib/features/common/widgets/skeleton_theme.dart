@@ -14,7 +14,10 @@ const kFaioSkeletonEffect = ShimmerEffect(
 );
 
 ShimmerEffect themedFaioSkeletonEffect(Color baseColor) {
-  final highlight = Color.alphaBlend(Colors.white.withOpacity(0.18), baseColor);
+  final highlight = Color.alphaBlend(
+    Colors.white.withValues(alpha: 0.18),
+    baseColor,
+  );
   return ShimmerEffect(
     baseColor: baseColor,
     highlightColor: highlight,

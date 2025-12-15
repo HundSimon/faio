@@ -86,10 +86,10 @@ class FeedController extends StateNotifier<FeedState> {
     FeedItemComparator? sortComparator,
     String? debugLabel,
   }) : _fetchPage = fetchPage,
-      _filter = filter ?? _defaultFilter,
-      _sortComparator = sortComparator,
-      _debugLabel = debugLabel,
-      super(const FeedState()) {
+       _filter = filter ?? _defaultFilter,
+       _sortComparator = sortComparator,
+       _debugLabel = debugLabel,
+       super(const FeedState()) {
     _loadInitial();
   }
 
@@ -124,10 +124,7 @@ class FeedController extends StateNotifier<FeedState> {
         filtered.sort(comparator);
       }
       final seen = filtered.map((item) => item.id).toSet();
-      final balanced = _applyTrailingPixivPolicy(
-        filtered,
-        const [],
-      );
+      final balanced = _applyTrailingPixivPolicy(filtered, const []);
 
       state = state.copyWith(
         items: List.unmodifiable(balanced.visible),
@@ -240,10 +237,7 @@ class FeedController extends StateNotifier<FeedState> {
     }
     final combined = [...items, ...previousHidden];
     if (combined.isEmpty) {
-      return const _TrailingPixivBalance(
-        visible: [],
-        hidden: [],
-      );
+      return const _TrailingPixivBalance(visible: [], hidden: []);
     }
     final sorted = _sort(combined);
     final firstPixivIndex = sorted.indexWhere(_isPixivSource);
@@ -273,10 +267,7 @@ class FeedController extends StateNotifier<FeedState> {
 }
 
 class _TrailingPixivBalance {
-  const _TrailingPixivBalance({
-    required this.visible,
-    required this.hidden,
-  });
+  const _TrailingPixivBalance({required this.visible, required this.hidden});
 
   final List<FaioContent> visible;
   final List<FaioContent> hidden;
@@ -332,7 +323,6 @@ final illustrationFeedControllerProvider = StateNotifierProvider.autoDispose
           return controller;
         case IllustrationSource.e621:
           final service = ref.watch(e621ServiceProvider);
-          final filterResolver = () => ref.read(tagFilterProvider);
           final controller = FeedController(
             fetchPage: (page, limit) async {
               final posts = await service.fetchPosts(page: page, limit: limit);
@@ -341,7 +331,7 @@ final illustrationFeedControllerProvider = StateNotifierProvider.autoDispose
                   .whereType<FaioContent>()
                   .where((item) => item.type == ContentType.illustration)
                   .toList();
-              final filter = filterResolver();
+              final filter = ref.read(tagFilterProvider);
               final filtered = filter.isInactive
                   ? items
                   : items.where(filter.allows).toList();

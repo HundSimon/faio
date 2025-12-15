@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -150,13 +151,13 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
     ref.read(novelFeedSelectionProvider.notifier).requestScrollTo(index);
   }
 
-  Future<bool> _handleWillPop() async {
-    if (_isPopping) return true;
+  Future<void> _handlePopRequested() async {
+    if (_isPopping) return;
     _isPopping = true;
     _requestScrollBack();
     await Future<void>.delayed(const Duration(milliseconds: 16));
-    _isPopping = false;
-    return true;
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   void _maybeAttachPagerFromFeed(List<FaioContent> items) {
@@ -269,10 +270,17 @@ class _NovelDetailScreenState extends ConsumerState<NovelDetailScreen> {
             skipWarningPrompt: widget.skipInitialWarningPrompt,
           );
 
-    return WillPopScope(
-      onWillPop: _handleWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_handlePopRequested());
+      },
       child: Scaffold(
         appBar: AppBar(
+          leading: BackButton(
+            onPressed: () => unawaited(_handlePopRequested()),
+          ),
           title: Text(
             currentTitle,
             maxLines: 1,
@@ -1223,7 +1231,7 @@ class _ReadActionCard extends StatelessWidget {
               value: progress.relativeOffset.clamp(0.0, 1.0),
               minHeight: 6,
               color: theme.colorScheme.primary,
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1238,8 +1246,8 @@ class _ReadActionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _GradientProgressTrack(
-            startColor: theme.colorScheme.primary.withOpacity(0.18),
-            endColor: theme.colorScheme.primary.withOpacity(0.05),
+            startColor: theme.colorScheme.primary.withValues(alpha: 0.18),
+            endColor: theme.colorScheme.primary.withValues(alpha: 0.05),
           ),
           const SizedBox(height: 8),
           Text(
@@ -1359,8 +1367,8 @@ class _ReadStatusChip extends StatelessWidget {
     final theme = Theme.of(context);
     final bg =
         background ??
-        theme.colorScheme.onSurface.withOpacity(
-          theme.brightness == Brightness.dark ? 0.14 : 0.12,
+        theme.colorScheme.onSurface.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.14 : 0.12,
         );
     final fg = foreground ?? theme.colorScheme.onSurface;
     return Container(
@@ -1594,8 +1602,8 @@ class _InfoPill extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(
-          theme.brightness == Brightness.dark ? 0.7 : 0.9,
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.7 : 0.9,
         ),
         borderRadius: BorderRadius.circular(999),
       ),
@@ -1767,7 +1775,10 @@ class _ProgressiveNovelImageState extends State<_ProgressiveNovelImage> {
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
-              colors: [Colors.black.withOpacity(0.35), Colors.transparent],
+              colors: [
+                Colors.black.withValues(alpha: 0.35),
+                Colors.transparent,
+              ],
             ),
           ),
         ),

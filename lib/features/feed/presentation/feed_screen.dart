@@ -564,7 +564,9 @@ class _NovelTabState extends ConsumerState<_NovelTab> {
       if (context != null) {
         await Scrollable.ensureVisible(
           context,
-          duration: immediate ? Duration.zero : const Duration(milliseconds: 320),
+          duration: immediate
+              ? Duration.zero
+              : const Duration(milliseconds: 320),
           curve: Curves.easeInOut,
           alignment: 0.1,
         );
@@ -849,8 +851,8 @@ class _NovelListItem extends ConsumerWidget {
     final authorName = item.authorName?.trim();
     final hasAuthor = authorName?.isNotEmpty ?? false;
     final cardColor = Color.alphaBlend(
-      theme.colorScheme.surfaceContainerHighest.withOpacity(
-        theme.brightness == Brightness.dark ? 0.28 : 0.2,
+      theme.colorScheme.surfaceContainerHighest.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.28 : 0.2,
       ),
       theme.colorScheme.surface,
     );
@@ -980,7 +982,7 @@ class _NovelListItem extends ConsumerWidget {
           );
           context.push('/feed/novel/$novelId?index=$index', extra: extras);
         },
-        splashColor: theme.colorScheme.primary.withOpacity(0.08),
+        splashColor: theme.colorScheme.primary.withValues(alpha: 0.08),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: LayoutBuilder(
@@ -1060,7 +1062,7 @@ class _NovelListItem extends ConsumerWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.error.withOpacity(0.14),
+                        color: theme.colorScheme.error.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -1176,8 +1178,8 @@ class _NovelListSkeletonItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cardColor = Color.alphaBlend(
-      theme.colorScheme.surfaceContainerHighest.withOpacity(
-        theme.brightness == Brightness.dark ? 0.28 : 0.2,
+      theme.colorScheme.surfaceContainerHighest.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.28 : 0.2,
       ),
       theme.colorScheme.surface,
     );

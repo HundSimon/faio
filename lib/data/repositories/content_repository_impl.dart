@@ -95,9 +95,7 @@ class ContentRepositoryImpl implements ContentRepository {
       }
     }
 
-    _log(
-      'fetchFeedPage(page=$page, limit=$limit, tags=$normalizedTags)',
-    );
+    _log('fetchFeedPage(page=$page, limit=$limit, tags=$normalizedTags)');
     sources.add(
       safeFetch(
         'e621',
@@ -275,9 +273,7 @@ class ContentRepositoryImpl implements ContentRepository {
         .where((item) => item.type == ContentType.illustration)
         .toList();
     final filtered = _filterItems(items);
-    _log(
-      'Fetched ${filtered.length} e621 items (page=$page, limit=$limit)',
-    );
+    _log('Fetched ${filtered.length} e621 items (page=$page, limit=$limit)');
     return filtered;
   }
 
@@ -330,11 +326,10 @@ class ContentRepositoryImpl implements ContentRepository {
 final contentRepositoryProvider = Provider<ContentRepository>((ref) {
   final e621Service = ref.watch(e621ServiceProvider);
   final pixivRepository = ref.watch(pixivRepositoryProvider);
-  final tagFilterResolver = () => ref.read(tagFilterProvider);
   final repository = ContentRepositoryImpl(
     e621Service: e621Service,
     pixivRepository: pixivRepository,
-    tagFilterResolver: tagFilterResolver,
+    tagFilterResolver: () => ref.read(tagFilterProvider),
   );
   ref.listen<E621Credentials?>(e621AuthProvider, (previous, next) {
     unawaited(repository.refreshFeed());

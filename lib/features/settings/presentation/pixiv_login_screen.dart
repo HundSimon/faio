@@ -105,11 +105,7 @@ class _PixivLoginScreenState extends ConsumerState<PixivLoginScreen> {
   }
 
   void _handleWebError(WebResourceError error) {
-    String? failingUrl;
-    if (error is AndroidWebResourceError) {
-      failingUrl = error.failingUrl;
-    }
-    failingUrl ??= error.url;
+    final failingUrl = error.url;
 
     final parsedFailingUri = failingUrl != null
         ? Uri.tryParse(failingUrl)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:animations/animations.dart';
@@ -165,14 +166,14 @@ class _IllustrationDetailScreenState
         .requestScrollTo(widget.source, _currentIndex);
   }
 
-  Future<bool> _handleWillPop() async {
-    if (_isPopping) return true;
+  Future<void> _handlePopRequested() async {
+    if (_isPopping) return;
     _isPopping = true;
     _requestScrollBack();
     // Give the feed a frame to jump to the target tile before the Hero starts.
     await Future<void>.delayed(const Duration(milliseconds: 16));
-    _isPopping = false;
-    return true;
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   @override
@@ -269,11 +270,17 @@ class _IllustrationDetailScreenState
         ? items[_currentIndex].title
         : '作品详情';
 
-    return WillPopScope(
-      onWillPop: _handleWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_handlePopRequested());
+      },
       child: Scaffold(
         appBar: AppBar(
-          leading: const BackButton(),
+          leading: BackButton(
+            onPressed: () => unawaited(_handlePopRequested()),
+          ),
           title: Text(
             currentTitle,
             maxLines: 1,
@@ -606,7 +613,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
                             colors: [
-                              Colors.black.withOpacity(0.45),
+                              Colors.black.withValues(alpha: 0.45),
                               Colors.transparent,
                             ],
                           ),
@@ -623,7 +630,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.55),
+                            color: Colors.black.withValues(alpha: 0.55),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -660,7 +667,7 @@ class _IllustrationDetailViewState extends State<_IllustrationDetailView>
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Row(
@@ -1096,7 +1103,7 @@ class _IllustrationFullscreenViewState
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(

@@ -51,20 +51,18 @@ class LibrarySeriesFavorite extends Equatable {
 
 class LibraryFavoriteEntry extends Equatable {
   const LibraryFavoriteEntry.content({
-    required FaioContent content,
-    required DateTime savedAt,
+    required this.content,
+    required this.savedAt,
   }) : kind = LibraryFavoriteKind.content,
-       content = content,
        series = null,
-       savedAt = savedAt;
+       super();
 
   const LibraryFavoriteEntry.series({
-    required LibrarySeriesFavorite series,
-    required DateTime savedAt,
+    required this.series,
+    required this.savedAt,
   }) : kind = LibraryFavoriteKind.series,
        content = null,
-       series = series,
-       savedAt = savedAt;
+       super();
 
   final LibraryFavoriteKind kind;
   final FaioContent? content;

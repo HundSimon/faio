@@ -577,7 +577,9 @@ class _ReaderSettingsSheetState extends State<_ReaderSettingsSheet> {
     final theme = Theme.of(context);
     final baseColor =
         theme.bottomSheetTheme.backgroundColor ?? theme.colorScheme.surface;
-    final panelColor = baseColor.withOpacity(_isAdjustingSlider ? 0.6 : 1.0);
+    final panelColor = baseColor.withValues(
+      alpha: _isAdjustingSlider ? 0.6 : 1.0,
+    );
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -796,7 +798,7 @@ class _ReaderScrollIndicator extends StatelessWidget {
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: palette.subtleText.withOpacity(0.15),
+                        color: palette.subtleText.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -806,7 +808,7 @@ class _ReaderScrollIndicator extends StatelessWidget {
                         width: 4,
                         height: thumbHeight,
                         decoration: BoxDecoration(
-                          color: palette.accent.withOpacity(0.85),
+                          color: palette.accent.withValues(alpha: 0.85),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
