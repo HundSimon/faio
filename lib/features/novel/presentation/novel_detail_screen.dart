@@ -976,6 +976,9 @@ class _NovelDetailContentState extends ConsumerState<_NovelDetailContent> {
                 : () async {
                     final storage = ref.read(novelReadingStorageProvider);
                     await storage.clearProgress(novelId);
+                    ref
+                        .read(novelProgressEpochProvider.notifier)
+                        .update((value) => value + 1);
                     ref.invalidate(novelReadingProgressProvider(novelId));
                     if (context.mounted) {
                       ScaffoldMessenger.of(

@@ -94,8 +94,14 @@ final novelReadingProgressProvider =
       return storage.loadProgress(novelId);
     }, name: 'novelReadingProgressProvider');
 
+final novelProgressEpochProvider = StateProvider<int>(
+  (ref) => 0,
+  name: 'novelProgressEpochProvider',
+);
+
 final lastReadNovelInSeriesProvider =
     AutoDisposeFutureProvider.family<int?, int>((ref, seriesId) async {
+      ref.watch(novelProgressEpochProvider);
       final series = await ref.watch(
         novelSeriesDetailProvider(seriesId).future,
       );

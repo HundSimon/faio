@@ -85,6 +85,7 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
       contentExtent: contentExtent,
     );
     await storage.saveProgress(progress);
+    ref.read(novelProgressEpochProvider.notifier).update((value) => value + 1);
     ref.invalidate(novelReadingProgressProvider(widget.novelId));
   }
 
