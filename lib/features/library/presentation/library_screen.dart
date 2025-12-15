@@ -17,8 +17,6 @@ import 'package:faio/features/feed/providers/feed_providers.dart'
 import 'package:faio/features/feed/presentation/illustration_detail_screen.dart'
     show IllustrationDetailRouteArgs, IllustrationDetailScreen;
 import '../../novel/presentation/novel_detail_screen.dart';
-
-import '../../novel/presentation/widgets/novel_series_sheet.dart';
 import '../domain/library_entries.dart';
 import '../providers/library_providers.dart';
 import 'widgets/favorite_icon_button.dart';
@@ -31,15 +29,19 @@ class LibraryScreen extends ConsumerWidget {
     final favoritesAsync = ref.watch(libraryFavoritesProvider);
     final historyAsync = ref.watch(libraryHistoryProvider);
 
-    final favoritesPreview =
+    final favoritesPreviewItems =
         (favoritesAsync.valueOrNull ?? const <LibraryFavoriteEntry>[])
-            .where((entry) => entry.content != null)
-            .map((entry) => entry.content!)
+            .where((entry) => entry.content != null || entry.series != null)
+            .map(
+              (entry) => entry.content != null
+                  ? _LibraryNavPreviewItem.content(entry.content!)
+                  : _LibraryNavPreviewItem.series(entry.series!),
+            )
             .take(8)
             .toList();
-    final historyPreview =
+    final historyPreviewItems =
         (historyAsync.valueOrNull ?? const <LibraryHistoryEntry>[])
-            .map((entry) => entry.content)
+            .map((entry) => _LibraryNavPreviewItem.content(entry.content))
             .take(8)
             .toList();
 
@@ -65,8 +67,9 @@ class LibraryScreen extends ConsumerWidget {
               title: '收藏',
               countLabel: favoritesCount != null ? '共 $favoritesCount 项' : null,
               loading: favoritesAsync.isLoading,
-              previewContents: favoritesPreview ?? const [],
+              previewItems: favoritesPreviewItems,
               onOpenContent: (content) => _openContent(context, content),
+              onOpenSeries: (series) => _openSeries(context, series),
               onTap: () => context.push('/library/favorites'),
             ),
             const SizedBox(height: 16),
@@ -74,7 +77,7 @@ class LibraryScreen extends ConsumerWidget {
               title: '浏览记录',
               countLabel: historyCount != null ? '共 $historyCount 条' : null,
               loading: historyAsync.isLoading,
-              previewContents: historyPreview ?? const [],
+              previewItems: historyPreviewItems,
               onOpenContent: (content) => _openContent(context, content),
               onTap: () => context.push('/library/history'),
             ),
@@ -172,6 +175,8 @@ class _LibraryFavoritesScreenState
       final allText = [
         series.title,
         series.caption ?? '',
+        series.source ?? '',
+        series.authorName ?? '',
       ].join(' ').toLowerCase();
       return allText.contains(query);
     }
@@ -708,9 +713,19 @@ class _LibrarySeriesTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final metaParts = [
+      '小说系列',
+      series.source ?? 'furrynovel',
+      if (series.authorName != null && series.authorName!.trim().isNotEmpty)
+        series.authorName!.trim(),
+    ];
+    final meta = metaParts.where((part) => part.trim().isNotEmpty).join(' · ');
+    final summary = series.caption != null && series.caption!.trim().isNotEmpty
+        ? series.caption!.trim()
+        : '暂无简介';
     return Material(
       color: theme.colorScheme.surfaceContainerHighest.withOpacity(
-        theme.brightness == Brightness.dark ? 0.35 : 0.45,
+        theme.brightness == Brightness.dark ? 0.35 : 0.5,
       ),
       borderRadius: BorderRadius.circular(16),
       child: Stack(
@@ -720,12 +735,14 @@ class _LibrarySeriesTile extends StatelessWidget {
             onTap: onTap,
             onLongPress: onLongPress,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.all(12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.collections_bookmark,
-                    color: theme.colorScheme.primary,
+                  SizedBox(
+                    width: 72,
+                    height: 72,
+                    child: _SeriesThumbnail(coverUrl: series.coverUrl),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -740,18 +757,20 @@ class _LibrarySeriesTile extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        if (series.caption != null &&
-                            series.caption!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            series.caption!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                        const SizedBox(height: 6),
+                        Text(
+                          meta,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
-                        ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          summary,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       ],
                     ),
                   ),
@@ -778,16 +797,18 @@ class _LibraryNavCard extends StatelessWidget {
     required this.onTap,
     this.countLabel,
     this.loading = false,
-    required this.previewContents,
+    required this.previewItems,
     this.onOpenContent,
+    this.onOpenSeries,
   });
 
   final String title;
   final VoidCallback onTap;
   final String? countLabel;
   final bool loading;
-  final List<FaioContent> previewContents;
+  final List<_LibraryNavPreviewItem> previewItems;
   final ValueChanged<FaioContent>? onOpenContent;
+  final ValueChanged<LibrarySeriesFavorite>? onOpenSeries;
 
   @override
   Widget build(BuildContext context) {
@@ -795,7 +816,7 @@ class _LibraryNavCard extends StatelessWidget {
     final surface = theme.colorScheme.surfaceContainerHighest.withOpacity(
       theme.brightness == Brightness.dark ? 0.32 : 0.5,
     );
-    final items = previewContents.take(6).toList();
+    final items = previewItems.take(6).toList();
     return Material(
       color: surface,
       borderRadius: BorderRadius.circular(16),
@@ -863,10 +884,16 @@ class _LibraryNavCard extends StatelessWidget {
                       if (index == items.length) {
                         return _ViewMoreTile(onTap: onTap);
                       }
-                      final content = items[index];
-                      return _PreviewTile(
-                        content: content,
-                        onTap: () => onOpenContent?.call(content),
+                      final item = items[index];
+                      return item.when(
+                        content: (content) => _PreviewTile(
+                          content: content,
+                          onTap: () => onOpenContent?.call(content),
+                        ),
+                        series: (series) => _PreviewSeriesTile(
+                          series: series,
+                          onTap: () => onOpenSeries?.call(series),
+                        ),
                       );
                     },
                     separatorBuilder: (context, index) =>
@@ -879,6 +906,31 @@ class _LibraryNavCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _LibraryNavPreviewItem {
+  const _LibraryNavPreviewItem._({this.content, this.series})
+    : assert(content != null || series != null);
+
+  const _LibraryNavPreviewItem.content(FaioContent content)
+    : this._(content: content);
+
+  const _LibraryNavPreviewItem.series(LibrarySeriesFavorite series)
+    : this._(series: series);
+
+  final FaioContent? content;
+  final LibrarySeriesFavorite? series;
+
+  T when<T>({
+    required T Function(FaioContent content) content,
+    required T Function(LibrarySeriesFavorite series) series,
+  }) {
+    final valueContent = this.content;
+    if (valueContent != null) {
+      return content(valueContent);
+    }
+    return series(this.series!);
   }
 }
 
@@ -907,6 +959,43 @@ class _PreviewTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               content.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewSeriesTile extends StatelessWidget {
+  const _PreviewSeriesTile({required this.series, this.onTap});
+
+  final LibrarySeriesFavorite series;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 88,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 80,
+              height: 80,
+              child: _SeriesThumbnail(coverUrl: series.coverUrl),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              series.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -1227,6 +1316,67 @@ class _EmptyHint extends StatelessWidget {
   }
 }
 
+class _SeriesThumbnail extends StatefulWidget {
+  const _SeriesThumbnail({required this.coverUrl});
+
+  final Uri? coverUrl;
+
+  @override
+  State<_SeriesThumbnail> createState() => _SeriesThumbnailState();
+}
+
+class _SeriesThumbnailState extends State<_SeriesThumbnail> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final placeholder = Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.collections_bookmark_outlined,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+
+    final coverUrl = widget.coverUrl;
+    if (coverUrl == null) {
+      return placeholder;
+    }
+
+    final urls = pixivImageUrlCandidates(coverUrl);
+    final headers = pixivImageHeaders(url: coverUrl);
+    final currentUrl = urls[_index];
+    final imageProvider = CachedNetworkImageProvider(
+      currentUrl.toString(),
+      headers: headers,
+      cacheManager: pixivImageCacheManagerForUrl(currentUrl),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image(
+        image: imageProvider,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          if (_index < urls.length - 1) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              setState(() => _index += 1);
+            });
+            return const SizedBox.shrink();
+          }
+          return placeholder;
+        },
+      ),
+    );
+  }
+}
+
 class _ContentThumbnail extends StatefulWidget {
   const _ContentThumbnail({required this.content});
 
@@ -1481,14 +1631,7 @@ Future<void> _openSeries(
   BuildContext context,
   LibrarySeriesFavorite series,
 ) async {
-  final selected = await showNovelSeriesSheet(
-    context: context,
-    seriesId: series.seriesId,
-  );
-  if (selected == null) {
-    return;
-  }
-  context.push('/feed/novel/$selected');
+  context.push('/feed/novel-series/${series.seriesId}');
 }
 
 Future<void> _launchExternal(BuildContext context, Uri url) async {

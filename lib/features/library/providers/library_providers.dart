@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/shared_preferences_provider.dart';
+import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../domain/models/content_item.dart';
+import '../../../domain/repositories/pixiv_repository.dart';
 import '../data/library_storage.dart';
 import '../domain/library_entries.dart';
 
@@ -21,10 +23,115 @@ final libraryFavoritesProvider =
 class LibraryFavoritesController
     extends AsyncNotifier<List<LibraryFavoriteEntry>> {
   LibraryStorage get _storage => ref.read(libraryStorageProvider);
+  PixivRepository get _pixivRepository => ref.read(pixivRepositoryProvider);
+  bool _hydrating = false;
 
   @override
   Future<List<LibraryFavoriteEntry>> build() async {
-    return _storage.loadFavorites();
+    final entries = await _storage.loadFavorites();
+    _maybeHydrateSeriesFavorites();
+    return entries;
+  }
+
+  Future<void> _maybeHydrateSeriesFavorites() async {
+    if (_hydrating) return;
+    _hydrating = true;
+    try {
+      final current = await _current();
+      final next = await _hydrateSeriesFavorites(current);
+      if (!identical(next, current)) {
+        state = AsyncValue.data(next);
+      }
+    } catch (_) {
+      // Ignore hydration errors; keep cached favorites.
+    } finally {
+      _hydrating = false;
+    }
+  }
+
+  Future<List<LibraryFavoriteEntry>> _hydrateSeriesFavorites(
+    List<LibraryFavoriteEntry> entries,
+  ) async {
+    final seriesIndexes = <int>[];
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      final series = entry.series;
+      if (series == null) continue;
+      final needsCover = series.coverUrl == null;
+      final needsCaption = series.caption == null || series.caption!.isEmpty;
+      final needsSource = series.source == null || series.source!.isEmpty;
+      final needsAuthor =
+          series.authorName == null || series.authorName!.isEmpty;
+      if (needsCover || needsCaption || needsSource || needsAuthor) {
+        seriesIndexes.add(i);
+      }
+    }
+
+    if (seriesIndexes.isEmpty) {
+      return entries;
+    }
+
+    var changed = false;
+    final next = [...entries];
+    for (final index in seriesIndexes) {
+      final entry = next[index];
+      final series = entry.series;
+      if (series == null) continue;
+      try {
+        final detail = await _pixivRepository.fetchNovelSeries(series.seriesId);
+        if (detail == null) continue;
+
+        final firstNovelId = detail.novels.isNotEmpty
+            ? detail.novels.first.id
+            : null;
+        final needsSource = series.source == null || series.source!.isEmpty;
+        final needsAuthor =
+            series.authorName == null || series.authorName!.isEmpty;
+        final needsAuthorId = series.authorId == null;
+        final shouldFetchNovel =
+            firstNovelId != null &&
+            (needsSource || needsAuthor || needsAuthorId);
+
+        final novelDetail = shouldFetchNovel
+            ? await _pixivRepository.fetchNovelDetail(firstNovelId)
+            : null;
+
+        final nextSeries = LibrarySeriesFavorite(
+          seriesId: series.seriesId,
+          title: detail.title.trim().isNotEmpty
+              ? detail.title.trim()
+              : series.title,
+          caption: detail.caption.trim().isNotEmpty
+              ? detail.caption.trim()
+              : series.caption,
+          coverUrl: detail.novels.isNotEmpty
+              ? detail.novels.first.coverUrl
+              : series.coverUrl,
+          source: (series.source != null && series.source!.trim().isNotEmpty)
+              ? series.source!.trim()
+              : novelDetail?.source,
+          authorName:
+              (series.authorName != null &&
+                  series.authorName!.trim().isNotEmpty)
+              ? series.authorName!.trim()
+              : novelDetail?.authorName,
+          authorId: series.authorId ?? novelDetail?.authorId,
+        );
+        next[index] = LibraryFavoriteEntry.series(
+          series: nextSeries,
+          savedAt: entry.savedAt,
+        );
+        changed = true;
+      } catch (_) {
+        continue;
+      }
+    }
+
+    if (!changed) {
+      return entries;
+    }
+    await _storage.saveFavorites(next);
+    return next;
   }
 
   Future<List<LibraryFavoriteEntry>> _current() async {
