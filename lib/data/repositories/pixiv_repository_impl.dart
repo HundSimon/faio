@@ -200,7 +200,7 @@ class PixivRepositoryImpl implements PixivRepository {
   @override
   Future<NovelSeriesDetail?> fetchNovelSeries(int seriesId) async {
     final series = await _furryNovelService.fetchSeries(seriesId);
-    return NovelMapper.fromFurrySeries(series);
+    return NovelMapper.fromFurrySeries(series, seriesId: seriesId);
   }
 
   Future<List<FaioContent>> _searchPixivNovels(String query, int limit) async {

@@ -23,18 +23,25 @@ class LibraryStorage {
     }
 
     final entries = <LibraryFavoriteEntry>[];
+    var dirty = false;
     for (final raw in rawList) {
       try {
         final decoded = jsonDecode(raw) as Map<String, dynamic>?;
         final entry = _decodeFavorite(decoded);
         if (entry != null) {
           entries.add(entry);
+        } else {
+          dirty = true;
         }
       } catch (_) {
+        dirty = true;
         continue;
       }
     }
     entries.sort((a, b) => b.savedAt.compareTo(a.savedAt));
+    if (dirty) {
+      await saveFavorites(entries);
+    }
     return entries;
   }
 
@@ -274,7 +281,7 @@ LibrarySeriesFavorite? _decodeSeries(Map<String, dynamic>? json) {
   }
   final id = json['seriesId'] as int?;
   final title = json['title'] as String?;
-  if (id == null || title == null) {
+  if (id == null || id <= 0 || title == null) {
     return null;
   }
   return LibrarySeriesFavorite(

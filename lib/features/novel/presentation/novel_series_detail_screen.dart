@@ -59,8 +59,9 @@ class NovelSeriesDetailScreen extends ConsumerWidget {
               : null;
           final firstNovel = firstNovelAsync?.valueOrNull;
 
+          final resolvedSeriesId = detail.id > 0 ? detail.id : seriesId;
           final seriesFavorite = LibrarySeriesFavorite(
-            seriesId: detail.id,
+            seriesId: resolvedSeriesId,
             title: detail.title.trim().isNotEmpty
                 ? detail.title.trim()
                 : '未知合集',

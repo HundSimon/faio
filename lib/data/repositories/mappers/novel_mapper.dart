@@ -111,14 +111,18 @@ class NovelMapper {
     );
   }
 
-  static NovelSeriesDetail? fromFurrySeries(FurryNovelSeriesDetail? detail) {
+  static NovelSeriesDetail? fromFurrySeries(
+    FurryNovelSeriesDetail? detail, {
+    required int seriesId,
+  }) {
     if (detail == null) {
       return null;
     }
 
     final tags = _stringTags(detail.tags);
+    final resolvedId = detail.id > 0 ? detail.id : seriesId;
     return NovelSeriesDetail(
-      id: detail.id,
+      id: resolvedId,
       title: detail.title,
       caption: detail.caption,
       tags: tags,
