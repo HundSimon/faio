@@ -1,7 +1,7 @@
-import '../../../domain/models/content_item.dart';
-import '../../../domain/models/content_tag.dart';
-import '../../../domain/models/novel_detail.dart';
-import '../../../domain/utils/content_id.dart';
+import '../models/content_item.dart';
+import '../models/content_tag.dart';
+import '../models/novel_detail.dart';
+import 'content_id.dart';
 
 FaioContent novelDetailToContent(NovelDetail detail, {FaioContent? fallback}) {
   final fallbackSummary = detail.fallbackSummary.trim();

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:faio/domain/models/library_entries.dart';
+
 import '../../../../domain/models/content_item.dart';
-import '../../domain/library_entries.dart';
 import '../../providers/library_providers.dart';
 
 class FavoriteIconButton extends ConsumerWidget {

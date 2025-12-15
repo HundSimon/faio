@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../domain/models/novel_reader.dart';
+import '../../domain/models/novel_reader.dart';
 
 class NovelReadingStorage {
   NovelReadingStorage({Future<SharedPreferences>? prefsFuture})

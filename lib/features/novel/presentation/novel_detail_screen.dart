@@ -24,9 +24,9 @@ import 'package:faio/features/common/widgets/detail_section_card.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
 import 'package:faio/features/common/widgets/summary_placeholder.dart';
 import 'package:faio/features/feed/providers/feed_providers.dart';
-import 'package:faio/features/library/domain/library_entries.dart';
+import 'package:faio/domain/models/library_entries.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
-import 'package:faio/features/library/utils/library_mappers.dart';
+import 'package:faio/domain/utils/novel_content_mapper.dart';
 import 'package:faio/features/library/presentation/widgets/favorite_icon_button.dart';
 import 'package:faio/features/novel/presentation/novel_hero.dart';
 

@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:faio/data/novel/novel_reading_storage.dart';
+
 import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../domain/models/novel_detail.dart';
 import '../../../domain/models/novel_reader.dart';
 import '../../../core/providers/shared_preferences_provider.dart';
-import '../data/novel_reading_storage.dart';
 
 class NovelFeedSelectionState {
   const NovelFeedSelectionState({this.selectedIndex, this.pendingScrollIndex});

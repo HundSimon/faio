@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../domain/models/content_item.dart';
-import '../../../domain/models/content_tag.dart';
-import '../domain/library_entries.dart';
+import '../../domain/models/content_item.dart';
+import '../../domain/models/content_tag.dart';
+import '../../domain/models/library_entries.dart';
 
 class LibraryStorage {
   LibraryStorage({Future<SharedPreferences>? prefsFuture})

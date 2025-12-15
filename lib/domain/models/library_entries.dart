@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../../../domain/models/content_item.dart';
+import 'content_item.dart';
 
 enum LibraryFavoriteKind { content, series }
 

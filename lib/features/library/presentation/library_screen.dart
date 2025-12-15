@@ -16,8 +16,8 @@ import 'package:faio/features/feed/providers/feed_providers.dart'
     show IllustrationSource;
 import 'package:faio/features/feed/presentation/illustration_detail_screen.dart'
     show IllustrationDetailRouteArgs, IllustrationDetailScreen;
+import 'package:faio/domain/models/library_entries.dart';
 import '../../novel/presentation/novel_detail_screen.dart';
-import '../domain/library_entries.dart';
 import '../providers/library_providers.dart';
 import 'widgets/favorite_icon_button.dart';
 

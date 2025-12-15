@@ -10,7 +10,7 @@ import 'package:faio/data/pixiv/pixiv_image_cache.dart';
 import 'package:faio/domain/utils/pixiv_image_utils.dart';
 import 'package:faio/features/common/widgets/categorized_tags.dart';
 import 'package:faio/features/common/widgets/detail_section_card.dart';
-import 'package:faio/features/library/domain/library_entries.dart';
+import 'package:faio/domain/models/library_entries.dart';
 import 'package:faio/features/library/providers/library_providers.dart';
 import 'package:faio/features/novel/providers/novel_providers.dart';
 

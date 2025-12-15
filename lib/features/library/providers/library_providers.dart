@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:faio/data/library/library_storage.dart';
+import 'package:faio/domain/models/library_entries.dart';
+
 import '../../../core/providers/shared_preferences_provider.dart';
 import '../../../data/pixiv/pixiv_providers.dart';
 import '../../../domain/models/content_item.dart';
 import '../../../domain/repositories/pixiv_repository.dart';
-import '../data/library_storage.dart';
-import '../domain/library_entries.dart';
 
 const _maxHistoryEntries = 200;
 
