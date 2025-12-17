@@ -22,6 +22,7 @@ class NovelReaderScreen extends ConsumerStatefulWidget {
 class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
   late final ScrollController _scrollController;
   Timer? _saveDebounce;
+  Timer? _controlsAutoHideTimer;
   bool _appliedInitialProgress = false;
   double? _pendingProgressRatio;
   double? _pendingAbsoluteOffset;
@@ -35,20 +36,26 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
   double? _cachedContentExtent;
   NovelReaderSettings? _cachedLayoutSettings;
   double? _cachedLayoutWidth;
+  bool _controlsVisible = true;
 
   static const _restoreRetryDelay = Duration(milliseconds: 200);
   static const _restoreTolerance = 12.0;
   static const _restoreMaxAttempts = 12;
+  static const _controlsAnimationDuration = Duration(milliseconds: 220);
+  static const _controlsInitialAutoHideDelay = Duration(milliseconds: 800);
+  static const _controlsAutoHideDelay = Duration(seconds: 3);
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_handleScroll);
+    _scheduleAutoHideControls(delay: _controlsInitialAutoHideDelay);
   }
 
   @override
   void dispose() {
     _saveDebounce?.cancel();
+    _controlsAutoHideTimer?.cancel();
     _scrollController.removeListener(_handleScroll);
     _persistProgress();
     _scrollController.dispose();
@@ -57,8 +64,37 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
 
   void _handleScroll() {
     _updateScrollMetricsSnapshot();
+    if (_controlsVisible) {
+      _controlsAutoHideTimer?.cancel();
+      setState(() {
+        _controlsVisible = false;
+      });
+    }
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(seconds: 1), _persistProgress);
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _controlsVisible = !_controlsVisible;
+    });
+    if (_controlsVisible) {
+      _scheduleAutoHideControls();
+    } else {
+      _controlsAutoHideTimer?.cancel();
+    }
+  }
+
+  void _scheduleAutoHideControls({Duration? delay}) {
+    _controlsAutoHideTimer?.cancel();
+    _controlsAutoHideTimer = Timer(delay ?? _controlsAutoHideDelay, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _controlsVisible = false;
+      });
+    });
   }
 
   Future<void> _persistProgress() async {
@@ -175,128 +211,142 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
 
             return Scaffold(
               backgroundColor: background,
-              appBar: AppBar(
-                backgroundColor: Colors.transparent,
-                foregroundColor: textColor,
-                elevation: 0,
-                title: Text(
-                  detail.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                actions: [
-                  IconButton(
-                    tooltip: '阅读设置',
-                    onPressed: () => _openSettingsSheet(context, settings),
-                    icon: const Icon(Icons.text_fields),
+              body: Stack(
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _toggleControls,
+                    child: SafeArea(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final availableWidth = constraints.maxWidth.isFinite
+                              ? constraints.maxWidth - 40
+                              : constraints.maxWidth;
+                          final contentWidth = availableWidth.isFinite
+                              ? availableWidth.clamp(80.0, double.infinity)
+                              : availableWidth;
+                          _ensureLayoutMetrics(
+                            context: context,
+                            detail: detail,
+                            settings: settings,
+                            blocks: blocks,
+                            maxWidth: contentWidth,
+                          );
+                          return Stack(
+                            children: [
+                              CustomScrollView(
+                                controller: _scrollController,
+                                slivers: [
+                                  SliverPadding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 24,
+                                    ),
+                                    sliver: SliverList(
+                                      delegate: SliverChildBuilderDelegate((
+                                        context,
+                                        index,
+                                      ) {
+                                        if (index == 0) {
+                                          return Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                detail.title,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleLarge
+                                                    ?.copyWith(
+                                                      color: textColor,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                              ),
+                                              if (detail.authorName !=
+                                                  null) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  detail.authorName!,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.copyWith(
+                                                        color:
+                                                            palette.subtleText,
+                                                      ),
+                                                ),
+                                              ],
+                                              const SizedBox(height: 16),
+                                            ],
+                                          );
+                                        }
+                                        final paragraphIndex = index - 1;
+                                        final block = blocks[paragraphIndex];
+                                        final previous = paragraphIndex > 0
+                                            ? blocks[paragraphIndex - 1]
+                                            : null;
+                                        return Padding(
+                                          padding: EdgeInsets.only(
+                                            top: _blockTopSpacing(
+                                              block,
+                                              previous,
+                                              settings,
+                                            ),
+                                            bottom: _blockBottomSpacing(
+                                              block,
+                                              settings,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            block.text,
+                                            style: _textStyleForBlock(
+                                              block,
+                                              settings,
+                                              textColor,
+                                            ),
+                                          ),
+                                        );
+                                      }, childCount: contentCount),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Positioned.fill(
+                                child: _ReaderScrollIndicator(
+                                  palette: palette,
+                                  progress: _currentScrollRatio,
+                                  thumbExtentRatio: _scrollThumbExtentRatio,
+                                  isScrollable: _hasScrollableContent,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _ReaderTopBar(
+                      visible: _controlsVisible,
+                      title: detail.title,
+                      foregroundColor: textColor,
+                      backgroundColor: background,
+                      animationDuration: _controlsAnimationDuration,
+                      onBackPressed: () => Navigator.of(context).maybePop(),
+                      onSettingsPressed: () {
+                        setState(() {
+                          _controlsVisible = true;
+                        });
+                        _scheduleAutoHideControls();
+                        _openSettingsSheet(context, settings);
+                      },
+                    ),
                   ),
                 ],
-              ),
-              body: SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final availableWidth = constraints.maxWidth.isFinite
-                        ? constraints.maxWidth - 40
-                        : constraints.maxWidth;
-                    final contentWidth = availableWidth.isFinite
-                        ? availableWidth.clamp(80.0, double.infinity)
-                        : availableWidth;
-                    _ensureLayoutMetrics(
-                      context: context,
-                      detail: detail,
-                      settings: settings,
-                      blocks: blocks,
-                      maxWidth: contentWidth,
-                    );
-                    return Stack(
-                      children: [
-                        CustomScrollView(
-                          controller: _scrollController,
-                          slivers: [
-                            SliverPadding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 24,
-                              ),
-                              sliver: SliverList(
-                                delegate: SliverChildBuilderDelegate((
-                                  context,
-                                  index,
-                                ) {
-                                  if (index == 0) {
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          detail.title,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleLarge
-                                              ?.copyWith(
-                                                color: textColor,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                        ),
-                                        if (detail.authorName != null) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            detail.authorName!,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                  color: palette.subtleText,
-                                                ),
-                                          ),
-                                        ],
-                                        const SizedBox(height: 16),
-                                      ],
-                                    );
-                                  }
-                                  final paragraphIndex = index - 1;
-                                  final block = blocks[paragraphIndex];
-                                  final previous = paragraphIndex > 0
-                                      ? blocks[paragraphIndex - 1]
-                                      : null;
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                      top: _blockTopSpacing(
-                                        block,
-                                        previous,
-                                        settings,
-                                      ),
-                                      bottom: _blockBottomSpacing(
-                                        block,
-                                        settings,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      block.text,
-                                      style: _textStyleForBlock(
-                                        block,
-                                        settings,
-                                        textColor,
-                                      ),
-                                    ),
-                                  );
-                                }, childCount: contentCount),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Positioned.fill(
-                          child: _ReaderScrollIndicator(
-                            palette: palette,
-                            progress: _currentScrollRatio,
-                            thumbExtentRatio: _scrollThumbExtentRatio,
-                            isScrollable: _hasScrollableContent,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
               ),
             );
           },
@@ -723,6 +773,82 @@ class _NovelReaderSkeleton extends StatelessWidget {
             const SizedBox(height: 8),
             line(height: 12, width: 120),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReaderTopBar extends StatelessWidget {
+  const _ReaderTopBar({
+    required this.visible,
+    required this.title,
+    required this.foregroundColor,
+    required this.backgroundColor,
+    required this.animationDuration,
+    required this.onBackPressed,
+    required this.onSettingsPressed,
+  });
+
+  final bool visible;
+  final String title;
+  final Color foregroundColor;
+  final Color backgroundColor;
+  final Duration animationDuration;
+  final VoidCallback onBackPressed;
+  final VoidCallback onSettingsPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final paddingTop = MediaQuery.paddingOf(context).top;
+    final height = paddingTop + kToolbarHeight;
+
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: animationDuration,
+        child: AnimatedSlide(
+          offset: visible ? Offset.zero : const Offset(0, -1),
+          duration: animationDuration,
+          child: SizedBox(
+            height: height,
+            child: Material(
+              color: backgroundColor.withValues(alpha: 0.92),
+              child: SafeArea(
+                bottom: false,
+                child: SizedBox(
+                  height: kToolbarHeight,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: '返回',
+                        onPressed: onBackPressed,
+                        icon: Icon(Icons.arrow_back, color: foregroundColor),
+                      ),
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: foregroundColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '阅读设置',
+                        onPressed: onSettingsPressed,
+                        icon: Icon(Icons.text_fields, color: foregroundColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
