@@ -9,6 +9,7 @@ import 'package:faio/domain/models/novel_reader.dart';
 import 'package:faio/features/common/widgets/skeleton_theme.dart';
 
 import '../providers/novel_providers.dart';
+import 'novel_reader_scroll_metrics.dart';
 
 class NovelReaderScreen extends ConsumerStatefulWidget {
   const NovelReaderScreen({required this.novelId, super.key});
@@ -44,6 +45,10 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
   static const _controlsAnimationDuration = Duration(milliseconds: 220);
   static const _controlsInitialAutoHideDelay = Duration(milliseconds: 800);
   static const _controlsAutoHideDelay = Duration(seconds: 3);
+  static const _readerHorizontalPadding = 20.0;
+  static const _readerVerticalPadding = 24.0;
+  static const _edgeEpsilon = 0.5;
+  static const _extentCalibrationTolerance = 1.0;
 
   @override
   void initState() {
@@ -105,12 +110,24 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
     final pixels = position.pixels;
     final viewport = position.viewportDimension;
     final max = position.maxScrollExtent;
-    final ratio = _resolveScrollRatio(
+    _calibrateContentExtent(position, viewport);
+    var ratio = resolveScrollRatio(
       pixels: pixels,
       viewport: viewport,
-      fallbackMax: max,
+      maxScrollExtent: max,
+      cachedContentExtent: _cachedContentExtent,
     );
-    final contentExtent = _effectiveContentExtent(viewport, max);
+    if (pixels <= position.minScrollExtent + _edgeEpsilon) {
+      ratio = 0.0;
+    } else if (position.atEdge &&
+        pixels >= position.maxScrollExtent - _edgeEpsilon) {
+      ratio = 1.0;
+    }
+    final contentExtent = effectiveContentExtent(
+      viewport: viewport,
+      maxScrollExtent: max,
+      cachedContentExtent: _cachedContentExtent,
+    );
     final storage = ref.read(novelReadingStorageProvider);
     final progress = NovelReadingProgress(
       novelId: widget.novelId,
@@ -220,7 +237,8 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final availableWidth = constraints.maxWidth.isFinite
-                              ? constraints.maxWidth - 40
+                              ? constraints.maxWidth -
+                                  (_readerHorizontalPadding * 2)
                               : constraints.maxWidth;
                           final contentWidth = availableWidth.isFinite
                               ? availableWidth.clamp(80.0, double.infinity)
@@ -239,8 +257,8 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
                                 slivers: [
                                   SliverPadding(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 24,
+                                      horizontal: _readerHorizontalPadding,
+                                      vertical: _readerVerticalPadding,
                                     ),
                                     sliver: SliverList(
                                       delegate: SliverChildBuilderDelegate((
@@ -398,9 +416,11 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
 
     final theme = Theme.of(context);
     final textDirection = Directionality.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
     final painter = TextPainter(
       textDirection: textDirection,
       textAlign: TextAlign.start,
+      textScaler: textScaler,
     );
     double paragraphTotal = 0;
     for (var i = 0; i < blocks.length; i++) {
@@ -441,7 +461,8 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
     }
     headerHeight += 16;
 
-    _cachedContentExtent = headerHeight + paragraphTotal;
+    _cachedContentExtent =
+        headerHeight + paragraphTotal + (_readerVerticalPadding * 2);
     _cachedLayoutSettings = settings;
     _cachedLayoutWidth = maxWidth;
 
@@ -490,12 +511,24 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
     final position = _scrollController.position;
     final max = position.maxScrollExtent;
     final viewport = position.viewportDimension;
-    final ratio = _resolveScrollRatio(
+    _calibrateContentExtent(position, viewport);
+    var ratio = resolveScrollRatio(
       pixels: position.pixels,
       viewport: viewport,
-      fallbackMax: max,
+      maxScrollExtent: max,
+      cachedContentExtent: _cachedContentExtent,
     );
-    final contentExtent = _effectiveContentExtent(viewport, max);
+    final contentExtent = effectiveContentExtent(
+      viewport: viewport,
+      maxScrollExtent: max,
+      cachedContentExtent: _cachedContentExtent,
+    );
+    if (position.pixels <= position.minScrollExtent + _edgeEpsilon) {
+      ratio = 0.0;
+    } else if (position.atEdge &&
+        position.pixels >= position.maxScrollExtent - _edgeEpsilon) {
+      ratio = 1.0;
+    }
     final scrollableExtent = (contentExtent - viewport).clamp(
       0.0,
       double.infinity,
@@ -523,33 +556,26 @@ class _NovelReaderScreenState extends ConsumerState<NovelReaderScreen> {
     return (a - b).abs() < epsilon;
   }
 
-  double _resolveScrollRatio({
-    required double pixels,
-    required double viewport,
-    required double fallbackMax,
-  }) {
-    final scrollable = _scrollableExtentFor(viewport, fallbackMax);
-    if (scrollable <= 0) {
-      return pixels <= 0 ? 0.0 : 1.0;
-    }
-    return (pixels / scrollable).clamp(0.0, 1.0);
-  }
-
-  double _scrollableExtentFor(double viewport, double fallbackMax) {
-    final contentExtent = _effectiveContentExtent(viewport, fallbackMax);
-    return (contentExtent - viewport).clamp(0.0, double.infinity);
-  }
-
-  double _effectiveContentExtent(double viewport, double fallbackMax) {
+  void _calibrateContentExtent(ScrollPosition position, double viewport) {
+    final pixels = position.pixels;
     final cached = _cachedContentExtent;
-    final fallback = (fallbackMax + viewport).clamp(viewport, double.infinity);
-    if (cached == null || !cached.isFinite) {
-      return fallback;
+
+    final atBottom =
+        position.atEdge && pixels >= position.maxScrollExtent - _edgeEpsilon;
+    if (atBottom) {
+      final contentFromPosition = position.maxScrollExtent + viewport;
+      if (contentFromPosition.isFinite && contentFromPosition > 0) {
+        _cachedContentExtent = contentFromPosition;
+      }
+      return;
     }
-    if (cached < viewport) {
-      return viewport;
+
+    final minRequired = pixels + viewport;
+    if (cached == null ||
+        minRequired > cached + _extentCalibrationTolerance ||
+        cached < viewport) {
+      _cachedContentExtent = minRequired < viewport ? viewport : minRequired;
     }
-    return cached;
   }
 
   Future<void> _openSettingsSheet(
